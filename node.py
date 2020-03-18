@@ -15,8 +15,6 @@ class node:
 		self.current_node_count = len(self.ring)
 
 
-
-
 	# def create_new_block():
 
 
