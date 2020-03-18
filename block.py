@@ -10,7 +10,7 @@ class Block:
 		self.transactions = []
 		self.nonce = None
 		self.previous_hash = previous_hash
-		self.current_hash = __myHash__()
+		self.current_hash = self.__myHash__()
 
 	
 	def __myHash__(self):
