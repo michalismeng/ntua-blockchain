@@ -1,5 +1,6 @@
 import block
 import wallet
+from blockchain import BlockChain
 
 class node:
 	def __init__(self, id, ip, port, wallet):
@@ -10,10 +11,12 @@ class node:
 		self.wallet = wallet
 		self.ip = ip
 		self.port = port
-
+		self.chain = BlockChain()
 		self.ring = []   #here we store information for every node, as its id, its address (ip:port) its public key and its balance
 		self.current_node_count = len(self.ring)
 
+	def get_hosts(self):
+		return [(ip, port) for ip, port, _, _ in self.ring]
 
 	# def create_new_block():
 
@@ -24,9 +27,6 @@ class node:
 
 
 	# def broadcast_transaction():
-
-
-
 
 
 	# def validdate_transaction():

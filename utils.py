@@ -4,6 +4,8 @@ import threading
 import communication
 import wallet
 import node
+import block
+import settings
 
 # convert RSA object to JSON
 def RSA2JSON(rsa):
@@ -30,7 +32,10 @@ def create_bootstrap_node():
     node_wallet = wallet.wallet()
 
     node_boot = node.node(0, bootstrap_ip, bootstrap_port, node_wallet)
-    node_boot.ring.append((bootstrap_ip, bootstrap_port, node_wallet.public_key, 0))
+    gen_block = block.Block.genesis(node_wallet.address)
+    node_boot.chain.chain.append(gen_block)
+    node_boot.NBC = 100*settings.N
+    node_boot.ring.append((bootstrap_ip, bootstrap_port, node_wallet.public_key, node_boot.NBC))
 
     return node_boot
 

@@ -12,29 +12,44 @@ from settings import bootstrap_ip, bootstrap_port
 import utils
 import settings
 import time
-
+import transaction
 import rx
 from rx import operators as ops
 from rx.subject import Subject
+import jsonpickle as jp
 
 app = Flask(__name__)
-
+def create_global_variable(name, value):
+    if name not in globals():
+        globals()[name] = value
 
 @app.route('/get-ring', methods=['POST'])
 def update_ring():
     args = request.get_json()
-    current_node.ring = list(request.json.values())[0]
+    current_node.ring = args['ring']
     print('broadcast success')
-    print('current ring', current_node.ring)
+    # print('current ring', current_node.ring)
     return jsonify('OK')
 
+@app.route('/add-transaction', methods=['POST'])
+def add_transaction():
+    args = jp.decode(request.data)
+    t = args['transaction']
+    # print(t.transaction_id)
+    # print(t.signature)
+    # print(t.sender_address)
+    print(t.verify_transaction())
+    # bootstrap_node.chain.add_transaction(t)
+    return jsonify('OK')
 
 def register_node_to_ring(node, ip, port, public_key):
     # add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
     # bottstrap node informs all other nodes and gives the request node an id and 100 NBCs
     print('adding node {}:{} to ring'.format(ip, port))
     bootstrap_node.ring.append((ip, port, public_key, 0))
-    pass
+    t = transaction.Transaction(bootstrap_node.wallet.address,public_key,100,bootstrap_node.NBC)
+    t.sign_transaction(bootstrap_node.wallet.private_key)
+    broadcast(bootstrap_node.get_hosts(),'add-transaction',{'transaction': t},True)
 
 def do_broadcast_ring():
     print('broadcating ring to all nodes...')
@@ -50,12 +65,12 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
 
     utils.startThreadedServer(app, bootstrap_ip, bootstrap_port)
     bootstrap_node = utils.create_bootstrap_node()
-    node_count = 1
 
     source = Subject()
 
     @app.route('/enter-ring', methods=['POST'])
     def get_data():
+        create_global_variable('node_count', 1) # initialize to 1 since the bootstrap node is already registered
         global node_count
 
         if(node_count >= settings.N):
