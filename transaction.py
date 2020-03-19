@@ -11,7 +11,7 @@ from Crypto.Signature import PKCS1_v1_5
 import json
 import requests
 from flask import Flask, jsonify, request, render_template
-
+import jsonpickle as jp
 
 class Transaction:
 
@@ -28,13 +28,8 @@ class Transaction:
 
 
     def __myHash__(self):
-        # sender may be of type int when doing the first transaction
-        sender =  self.sender_address if isinstance(self.sender_address, int) else utils.RSA2TEXT(self.sender_address)
-        hashString = "%s%s%s" % (sender, utils.RSA2TEXT(self.receiver_address), self.amount)
+        hashString = jp.encode((self.sender_address, self.receiver_address, self.amount))
         return SHA.new(hashString.encode())
-
-    # def to_dict(self):
-        
 
     def sign_transaction(self, private_key):
         """
@@ -45,16 +40,5 @@ class Transaction:
     def verify_transaction(self):
         h = self.__myHash__()
         return PKCS1_v1_5.new(self.sender_address).verify(h, self.signature)
-
-    # def tojson(self):
-    #     return json.dumps({
-    #         'sender_address':self.sender_address,
-    #         'receiver_address':self.receiver_address,
-    #         'amount':self.amount,
-    #         'transaction_inputs':self.transaction_inputs,
-    #         'transaction_outputs':self.transaction_outputs,
-    #         'signature':self.signature            
-    #         })
-
 
        

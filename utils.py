@@ -7,23 +7,12 @@ import node
 import block
 import settings
 
-# convert RSA object to JSON
-def RSA2JSON(rsa):
-    return rsa.exportKey("PEM").decode('ascii')
-
-def RSA2TEXT(rsa):
-    return rsa.exportKey("PEM").decode('ascii')
-
-# convert json to RSA
-def JSON2RSA(jsonSendable):
-    return RSA.importKey(jsonSendable.encode('ascii'))
-
 # create a non-bootstrap node
 def create_node(ip, port):
     node_wallet = wallet.wallet()
 
     public_key = node_wallet.public_key
-    message = { 'ip': ip, 'port': port, 'public_key': RSA2JSON(public_key) }
+    message = { 'ip': ip, 'port': port, 'public_key': public_key }
 
     response = communication.unicast_bootstrap("enter-ring", message)
     myid = response["id"]
@@ -37,7 +26,7 @@ def create_bootstrap_node():
     node_boot = node.node(0, bootstrap_ip, bootstrap_port, node_wallet)
     gen_block = block.Block.genesis(node_wallet.address)
     node_boot.chain.chain.append(gen_block)
-    node_boot.NBC = 100*settings.N
+    node_boot.NBC = 100 * settings.N
     node_boot.ring.append((bootstrap_ip, bootstrap_port, node_wallet.public_key, node_boot.NBC))
 
     return node_boot

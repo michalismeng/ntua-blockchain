@@ -25,7 +25,7 @@ def create_global_variable(name, value):
 
 @app.route('/get-ring', methods=['POST'])
 def update_ring():
-    args = request.get_json()
+    args = jp.decode(request.data)
     current_node.ring = args['ring']
     print('broadcast success')
     # print('current ring', current_node.ring)
@@ -35,9 +35,6 @@ def update_ring():
 def add_transaction():
     args = jp.decode(request.data)
     t = args['transaction']
-    # print(t.transaction_id)
-    # print(t.signature)
-    # print(t.sender_address)
     print(t.verify_transaction())
     # bootstrap_node.chain.add_transaction(t)
     return jsonify('OK')
@@ -51,12 +48,11 @@ def register_node_to_ring(node, ip, port, public_key):
     t = transaction.Transaction(bootstrap_node.wallet.address, public_key, 100, bootstrap_node.NBC)
 
     t.sign_transaction(bootstrap_node.wallet.private_key)
-    broadcast(bootstrap_node.get_hosts(),'add-transaction',{'transaction': t},True)
+    broadcast(bootstrap_node.get_hosts(),'add-transaction',{'transaction': t})
 
 def do_broadcast_ring():
     print('broadcating ring to all nodes...')
-    message = list(map(lambda r: (r[0], r[1], utils.RSA2JSON(r[2]), r[3]), bootstrap_node.ring))
-    broadcast([(ip, port) for ip, port, _, _ in bootstrap_node.ring], 'get-ring', {'ring': message})
+    broadcast([(ip, port) for ip, port, _, _ in bootstrap_node.ring], 'get-ring', { 'ring': bootstrap_node.ring })
 
 # bootstrap node
 if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
@@ -78,11 +74,11 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
         if(node_count >= settings.N):
             return jsonify("ERROR")
 
-        args = request.get_json()
+        args = jp.decode(request.data)
         ip, port, public_key = args['ip'], args['port'], args['public_key']
-        register_node_to_ring(node, ip, port, utils.JSON2RSA(public_key))
+        register_node_to_ring(node, ip, port, public_key)
 
-        response = {'id': node_count}
+        response = { 'id': node_count }
         node_count += 1
         source.on_next(node_count)
 
