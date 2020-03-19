@@ -26,18 +26,21 @@ def create_global_variable(name, value):
 @app.route('/get-ring', methods=['POST'])
 def update_ring():
     args = jp.decode(request.data)
-    current_node.ring = args['ring']
+    current_node().ring = args['ring']
     print('broadcast success')
-    # print('current ring', current_node.ring)
     return jsonify('OK')
 
 @app.route('/add-transaction', methods=['POST'])
 def add_transaction():
     args = jp.decode(request.data)
     t = args['transaction']
-    print(t.verify_transaction())
-    # bootstrap_node.chain.add_transaction(t)
+    if t.verify_transaction():
+        current_node().chain.add_transaction(t)     # TODO: Validate
+        ledger.on_next(current_node().chain)
+
     return jsonify('OK')
+
+ledger = Subject()
 
 def register_node_to_ring(node, ip, port, public_key):
     # add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
@@ -57,7 +60,9 @@ def do_broadcast_ring():
 # bootstrap node
 if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
 
-    def current_node(): return bootstrap_node
+    def current_node(): 
+        global bootstrap_node
+        return bootstrap_node
 
     print('Creating bootstrap node')
 
@@ -87,6 +92,8 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
     source.pipe(
         ops.filter(lambda n: n == settings.N)
     ).subscribe(lambda x: do_broadcast_ring())
+
+    ledger.subscribe(lambda chain: print('Updated chain: ', jp.encode(chain)))
     
     while True:
         pass
@@ -98,15 +105,19 @@ else:
         print('Bad usage')
         exit(1)
 
-    def current_node(): return node
-
     ip = sys.argv[1]
     port = sys.argv[2]
 
-    utils.startThreadedServer(app, ip, port)
-    node = utils.create_node(ip, port)
+    def current_node(): 
+        global miner_node
+        return miner_node
 
-    print('created node with id: ', node.id)
+    utils.startThreadedServer(app, ip, port)
+    miner_node = utils.create_node(ip, port)
+
+    print('created node with id: ', miner_node.id)
+
+    ledger.subscribe(lambda chain: print('Updated chain: ', jp.encode(chain)))
 
     while True:
         pass
