@@ -11,6 +11,9 @@ import settings
 def RSA2JSON(rsa):
     return rsa.exportKey("PEM").decode('ascii')
 
+def RSA2TEXT(rsa):
+    return rsa.exportKey("PEM").decode('ascii')
+
 # convert json to RSA
 def JSON2RSA(jsonSendable):
     return RSA.importKey(jsonSendable.encode('ascii'))

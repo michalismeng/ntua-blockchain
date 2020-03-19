@@ -47,7 +47,9 @@ def register_node_to_ring(node, ip, port, public_key):
     # bottstrap node informs all other nodes and gives the request node an id and 100 NBCs
     print('adding node {}:{} to ring'.format(ip, port))
     bootstrap_node.ring.append((ip, port, public_key, 0))
-    t = transaction.Transaction(bootstrap_node.wallet.address,public_key,100,bootstrap_node.NBC)
+    
+    t = transaction.Transaction(bootstrap_node.wallet.address, public_key, 100, bootstrap_node.NBC)
+
     t.sign_transaction(bootstrap_node.wallet.private_key)
     broadcast(bootstrap_node.get_hosts(),'add-transaction',{'transaction': t},True)
 

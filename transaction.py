@@ -28,7 +28,9 @@ class Transaction:
 
 
     def __myHash__(self):
-        hashString = "%s%s%s" % (self.sender_address, self.receiver_address, self.amount)
+        # sender may be of type int when doing the first transaction
+        sender =  self.sender_address if isinstance(self.sender_address, int) else utils.RSA2TEXT(self.sender_address)
+        hashString = "%s%s%s" % (sender, utils.RSA2TEXT(self.receiver_address), self.amount)
         return SHA.new(hashString.encode())
 
     # def to_dict(self):
