@@ -12,8 +12,12 @@ class node:
 		self.ip = ip
 		self.port = port
 		self.chain = BlockChain()
+		self.current_block = []		# TODO: Imporve this
 		self.ring = []   #here we store information for every node, as its id, its address (ip:port) its public key and its balance
 		self.current_node_count = len(self.ring)
+
+	def set_ring(self, ring):
+		self.ring = ring
 
 	def get_hosts(self):
 		return [(ip, port) for ip, port, _, _ in self.ring]

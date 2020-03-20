@@ -15,8 +15,40 @@ import time
 import transaction
 import rx
 from rx import operators as ops
-from rx.subject import Subject
+from rx.subject import Subject, ReplaySubject
 import jsonpickle as jp
+
+# uncomment to disable FLASK messages
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
+# transaction subject
+tsxS = ReplaySubject()
+
+# ring subject
+ringS = ReplaySubject()
+
+# node subject
+nodeS = ReplaySubject()
+
+nodeO = nodeS.pipe(
+    ops.do_action(lambda miner: print("Created miner with id: ", miner.id))
+)
+
+rx.zip(
+    nodeO, 
+    ringS,
+).pipe(
+    ops.do_action(lambda c: print('Received ring'))
+).subscribe(lambda x: x[0].set_ring(x[1]))
+
+rx.combine_latest(
+    nodeS,
+    tsxS
+).pipe(
+    ops.map(lambda nl: { 'node': nl[0], 'tx': nl[1] }),
+).subscribe(lambda o: o['node'].current_block.append(o['tx']))
 
 app = Flask(__name__)
 def create_global_variable(name, value):
@@ -26,7 +58,7 @@ def create_global_variable(name, value):
 @app.route('/get-ring', methods=['POST'])
 def update_ring():
     args = jp.decode(request.data)
-    current_node().ring = args['ring']
+    ringS.on_next(args['ring'])
     print('broadcast success')
     return jsonify('OK')
 
@@ -34,28 +66,29 @@ def update_ring():
 def add_transaction():
     args = jp.decode(request.data)
     t = args['transaction']
+    tsxS.on_next(t)
     if t.verify_transaction():
-        current_node().chain.add_transaction(t)     # TODO: Validate
-        ledger.on_next(current_node().chain)
+        pass
+        # current_node().chain.add_transaction(t)     # TODO: Validate
+        # tsxS.on_next(t)
 
     return jsonify('OK')
-
-ledger = Subject()
 
 def register_node_to_ring(node, ip, port, public_key):
     # add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
     # bottstrap node informs all other nodes and gives the request node an id and 100 NBCs
     print('adding node {}:{} to ring'.format(ip, port))
     bootstrap_node.ring.append((ip, port, public_key, 0))
-    
-    t = transaction.Transaction(bootstrap_node.wallet.address, public_key, 100, bootstrap_node.NBC)
-
-    t.sign_transaction(bootstrap_node.wallet.private_key)
-    broadcast(bootstrap_node.get_hosts(),'add-transaction',{'transaction': t})
 
 def do_broadcast_ring():
     print('broadcating ring to all nodes...')
-    broadcast([(ip, port) for ip, port, _, _ in bootstrap_node.ring], 'get-ring', { 'ring': bootstrap_node.ring })
+    print('hosts ', bootstrap_node.ring)
+    broadcast(bootstrap_node.get_hosts(), 'get-ring', { 'ring': bootstrap_node.ring })
+
+    for _, _, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
+        t = transaction.Transaction(bootstrap_node.wallet.address, public_key, 100, bootstrap_node.NBC)
+        t.sign_transaction(bootstrap_node.wallet.private_key)
+        broadcast(bootstrap_node.get_hosts(),'add-transaction', { 'transaction': t })
 
 # bootstrap node
 if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
@@ -68,8 +101,14 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
 
     utils.startThreadedServer(app, bootstrap_ip, bootstrap_port)
     bootstrap_node = utils.create_bootstrap_node()
+    nodeS.on_next(bootstrap_node)
 
-    source = Subject()
+    # node count subject
+    node_countS = ReplaySubject()
+
+    node_countS.pipe(
+        ops.filter(lambda n: n == settings.N - 1),
+    ).subscribe(lambda x: do_broadcast_ring())
 
     @app.route('/enter-ring', methods=['POST'])
     def get_data():
@@ -84,16 +123,11 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
         register_node_to_ring(node, ip, port, public_key)
 
         response = { 'id': node_count }
+        node_countS.on_next(node_count)
+
         node_count += 1
-        source.on_next(node_count)
 
         return jsonify(response)
-
-    source.pipe(
-        ops.filter(lambda n: n == settings.N)
-    ).subscribe(lambda x: do_broadcast_ring())
-
-    ledger.subscribe(lambda chain: print('Updated chain: ', jp.encode(chain)))
     
     while True:
         pass
@@ -114,10 +148,8 @@ else:
 
     utils.startThreadedServer(app, ip, port)
     miner_node = utils.create_node(ip, port)
-
-    print('created node with id: ', miner_node.id)
-
-    ledger.subscribe(lambda chain: print('Updated chain: ', jp.encode(chain)))
+    nodeS.on_next(miner_node)
 
     while True:
-        pass
+        x = input()
+        print(jp.encode(current_node().current_block))
