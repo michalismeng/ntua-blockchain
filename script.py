@@ -11,44 +11,54 @@ from communication import broadcast
 from settings import bootstrap_ip, bootstrap_port
 import utils
 import settings
-import time
 import transaction
 import rx
 from rx import operators as ops
 from rx.subject import Subject, ReplaySubject
+import rx.scheduler
 import jsonpickle as jp
+import time
+import threading
 
 # uncomment to disable FLASK messages
 import logging
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
+# thread_pool = ThreadPoolScheduler(5)
+# new_thread = NewThreadScheduler()
+
 # transaction subject
-tsxS = ReplaySubject()
+tsxS = Subject()
 
 # ring subject
-ringS = ReplaySubject()
+ringS = Subject()
 
 # node subject
-nodeS = ReplaySubject()
+nodeS = Subject()
 
-nodeO = nodeS.pipe(
-    ops.do_action(lambda miner: print("Created miner with id: ", miner.id))
-)
+nodeS.subscribe(lambda miner: print("Created miner with id: ", miner.id))
 
 rx.zip(
-    nodeO, 
+    nodeS, 
     ringS,
 ).pipe(
-    ops.do_action(lambda c: print('Received ring'))
-).subscribe(lambda x: x[0].set_ring(x[1]))
+    ops.do_action(lambda x: x[0].set_ring(x[1])),
+    ops.do_action(lambda x: print('Current ring: ', x[0].get_hosts())),
+).subscribe()
 
 rx.combine_latest(
     nodeS,
     tsxS
 ).pipe(
-    ops.map(lambda nl: { 'node': nl[0], 'tx': nl[1] }),
-).subscribe(lambda o: o['node'].current_block.append(o['tx']))
+    # ops.observe_on(rx.scheduler.ThreadPoolScheduler(1)),
+    # ops.do_action(lambda x: print(threading.currentThread().name)),
+
+    ops.map(lambda nl: { 'node': current_node(), 'tx': nl[1] }),
+    ops.filter(lambda o: o['tx'].verify_transaction()),
+    ops.do_action(lambda o: o['node'].current_block.append(o['tx'])),
+    ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node'])))
+).subscribe()
 
 app = Flask(__name__)
 def create_global_variable(name, value):
@@ -59,19 +69,12 @@ def create_global_variable(name, value):
 def update_ring():
     args = jp.decode(request.data)
     ringS.on_next(args['ring'])
-    print('broadcast success')
     return jsonify('OK')
 
 @app.route('/add-transaction', methods=['POST'])
 def add_transaction():
     args = jp.decode(request.data)
-    t = args['transaction']
-    tsxS.on_next(t)
-    if t.verify_transaction():
-        pass
-        # current_node().chain.add_transaction(t)     # TODO: Validate
-        # tsxS.on_next(t)
-
+    tsxS.on_next(args['transaction'])
     return jsonify('OK')
 
 def register_node_to_ring(node, ip, port, public_key):
@@ -82,13 +85,13 @@ def register_node_to_ring(node, ip, port, public_key):
 
 def do_broadcast_ring():
     print('broadcating ring to all nodes...')
-    print('hosts ', bootstrap_node.ring)
     broadcast(bootstrap_node.get_hosts(), 'get-ring', { 'ring': bootstrap_node.ring })
 
-    for _, _, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
+    for _, port, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
         t = transaction.Transaction(bootstrap_node.wallet.address, public_key, 100, bootstrap_node.NBC)
         t.sign_transaction(bootstrap_node.wallet.private_key)
-        broadcast(bootstrap_node.get_hosts(),'add-transaction', { 'transaction': t })
+        broadcast(bootstrap_node.get_hosts(), 'add-transaction', { 'transaction': t })
+
 
 # bootstrap node
 if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
@@ -107,6 +110,7 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
     node_countS = ReplaySubject()
 
     node_countS.pipe(
+        ops.observe_on(rx.scheduler.ThreadPoolScheduler(2)),       # force usage of another thread, othrwise broadcast fails
         ops.filter(lambda n: n == settings.N - 1),
     ).subscribe(lambda x: do_broadcast_ring())
 
@@ -152,4 +156,6 @@ else:
 
     while True:
         x = input()
-        print(jp.encode(current_node().current_block))
+        n = current_node()
+        for t in n.current_block:
+            print('Transaction ({})'.format(t.stringify(n)))

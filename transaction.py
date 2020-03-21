@@ -41,4 +41,7 @@ class Transaction:
         h = self.__myHash__()
         return PKCS1_v1_5.new(self.sender_address).verify(h, self.signature)
 
+    def stringify(self, node):
+	    return '({}, {}, {})'.format(node.address_to_host(self.sender_address), node.address_to_host(self.receiver_address), self.amount)
+
        

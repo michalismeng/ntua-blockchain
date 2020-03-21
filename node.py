@@ -22,6 +22,12 @@ class node:
 	def get_hosts(self):
 		return [(ip, port) for ip, port, _, _ in self.ring]
 
+	def address_to_host(self, address):
+		match = [(ip, port) for ip, port, pkey, _ in self.ring if pkey == address]
+		if len(match) > 0:
+			return match[0]
+		return 0
+
 	# def create_new_block():
 
 
