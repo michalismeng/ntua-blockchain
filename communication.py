@@ -19,6 +19,7 @@ def broadcast(hosts, api, message):
 
     for ip, port in hosts:
         try:
+            print('http://{}:{}/{}'.format(ip, port, api))
             response = requests.post('http://{}:{}/{}'.format(ip, port, api), message)
             responses.append(response.status_code == 200)
 

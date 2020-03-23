@@ -19,11 +19,12 @@ import rx.scheduler
 import jsonpickle as jp
 import time
 import threading
+import os
 
 # uncomment to disable FLASK messages
-import logging
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+# import logging
+# log = logging.getLogger('werkzeug')
+# log.setLevel(logging.ERROR)
 
 # thread_pool = ThreadPoolScheduler(5)
 # new_thread = NewThreadScheduler()
@@ -36,6 +37,9 @@ ringS = Subject()
 
 # node subject
 nodeS = Subject()
+
+# command subject
+commandS = Subject()
 
 nodeS.subscribe(lambda miner: print("Created miner with id: ", miner.id))
 
@@ -53,12 +57,39 @@ rx.combine_latest(
 ).pipe(
     # ops.observe_on(rx.scheduler.ThreadPoolScheduler(1)),
     # ops.do_action(lambda x: print(threading.currentThread().name)),
-
+    ops.delay(1),
     ops.map(lambda nl: { 'node': current_node(), 'tx': nl[1] }),
     ops.filter(lambda o: o['tx'].verify_transaction()),
+    ops.filter(lambda o: o['node'].validdate_transaction(o['tx'])),
     ops.do_action(lambda o: o['node'].current_block.append(o['tx'])),
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node'])))
 ).subscribe()
+
+def execute(n,s):
+    if s == 'exit':
+        os._exit(0)
+    elif s == 'UTXO':
+        print(n.get_UTXO())
+    elif s == 'UTXOS':
+        print(n.get_UTXOS())
+    elif 't' in s:
+        _, addres, amount = s.split(' ')
+        t = transaction.Transaction(n.wallet.address,
+                                    list(filter(lambda p: p[1] == int(addres),n.ring))[0][2],
+                                    int(amount),
+                                    n.balance(n.wallet.address),
+                                    n.get_suffisient_UTXOS(int(amount)))
+        t.sign_transaction(n.wallet.private_key)
+        broadcast(n.get_hosts(), 'add-transaction', { 'transaction': t })
+        print("exiting broadcast")
+
+
+rx.combine_latest(
+    nodeS,
+    commandS
+).subscribe(
+    lambda x: execute(x[0],x[1])
+)
 
 app = Flask(__name__)
 def create_global_variable(name, value):
@@ -74,6 +105,7 @@ def update_ring():
 @app.route('/add-transaction', methods=['POST'])
 def add_transaction():
     args = jp.decode(request.data)
+    print(args)
     tsxS.on_next(args['transaction'])
     return jsonify('OK')
 
@@ -81,14 +113,18 @@ def register_node_to_ring(node, ip, port, public_key):
     # add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
     # bottstrap node informs all other nodes and gives the request node an id and 100 NBCs
     print('adding node {}:{} to ring'.format(ip, port))
-    bootstrap_node.ring.append((ip, port, public_key, 0))
+    bootstrap_node.ring.append((ip, port, public_key, {}))
 
 def do_broadcast_ring():
     print('broadcating ring to all nodes...')
     broadcast(bootstrap_node.get_hosts(), 'get-ring', { 'ring': bootstrap_node.ring })
 
     for _, port, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
-        t = transaction.Transaction(bootstrap_node.wallet.address, public_key, 100, bootstrap_node.NBC)
+        t = transaction.Transaction(bootstrap_node.wallet.address,
+                                    public_key,
+                                    100,
+                                    bootstrap_node.balance(bootstrap_node.wallet.address),
+                                    bootstrap_node.get_suffisient_UTXOS(100))
         t.sign_transaction(bootstrap_node.wallet.private_key)
         broadcast(bootstrap_node.get_hosts(), 'add-transaction', { 'transaction': t })
 
@@ -134,7 +170,8 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
         return jsonify(response)
     
     while True:
-        pass
+        x = input()
+        commandS.on_next(x)
 
 
 # non-bootstrap nodes
@@ -144,7 +181,7 @@ else:
         exit(1)
 
     ip = sys.argv[1]
-    port = sys.argv[2]
+    port = int(sys.argv[2])
 
     def current_node(): 
         global miner_node
@@ -154,8 +191,9 @@ else:
     miner_node = utils.create_node(ip, port)
     nodeS.on_next(miner_node)
 
+
+
     while True:
         x = input()
-        n = current_node()
-        for t in n.current_block:
-            print('Transaction ({})'.format(t.stringify(n)))
+        commandS.on_next(x)
+        

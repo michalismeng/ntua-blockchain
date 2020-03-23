@@ -11,7 +11,7 @@ import settings
 def create_node(ip, port):
     node_wallet = wallet.wallet()
 
-    public_key = node_wallet.public_key
+    public_key = node_wallet.address
     message = { 'ip': ip, 'port': port, 'public_key': public_key }
 
     response = communication.unicast_bootstrap("enter-ring", message)
@@ -27,7 +27,7 @@ def create_bootstrap_node():
     gen_block = block.Block.genesis(node_wallet.address)
     node_boot.chain.chain.append(gen_block)
     node_boot.NBC = 100 * settings.N
-    node_boot.ring.append((bootstrap_ip, bootstrap_port, node_wallet.public_key, node_boot.NBC))
+    node_boot.ring.append((bootstrap_ip, bootstrap_port, node_wallet.address, {'0':(node_boot.wallet.address,100 * settings.N)}))
 
     return node_boot
 

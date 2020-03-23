@@ -15,12 +15,12 @@ import jsonpickle as jp
 
 class Transaction:
 
-    def __init__(self, sender_address, recipient_address, amount, total):
+    def __init__(self, sender_address, recipient_address, amount, total, transaction_inputs):
         self.sender_address = sender_address
         self.receiver_address = recipient_address
         self.amount = amount
-        self.transaction_inputs = None
-        self.transaction_id = self.__myHash__()
+        self.transaction_inputs = transaction_inputs
+        self.transaction_id = str(self.__myHash__().hexdigest())
         output_to_recipient = {"id": self.transaction_id, "recipient": recipient_address, "amount": amount}
         output_to_self = {"id": self.transaction_id, "recipient": sender_address, "amount": total - amount}
 
@@ -35,7 +35,7 @@ class Transaction:
         """
         Sign transaction with private key
         """
-        self.signature = PKCS1_v1_5.new(private_key).sign(self.transaction_id)
+        self.signature = PKCS1_v1_5.new(private_key).sign(self.__myHash__())
     
     def verify_transaction(self):
         h = self.__myHash__()
@@ -43,5 +43,3 @@ class Transaction:
 
     def stringify(self, node):
 	    return '({}, {}, {})'.format(node.address_to_host(self.sender_address), node.address_to_host(self.receiver_address), self.amount)
-
-       

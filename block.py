@@ -17,7 +17,7 @@ class Block:
 	@staticmethod
 	def genesis(bootstrap_address):
 		b = Block(0,1,0)
-		b.add_transaction(Transaction(0,bootstrap_address,settings.N*100,settings.N*100))
+		b.add_transaction(Transaction(0,bootstrap_address,settings.N*100,settings.N*100,[]))
 		return b
 	
 	def __myHash__(self):

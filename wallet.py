@@ -23,7 +23,6 @@ class wallet:
 
 	def __init__(self):
 		self.private_key = RSA.generate(2048)
-		self.public_key = self.private_key.publickey()
-		self.address = self.public_key
+		self.address = self.private_key.publickey()
 
 		#self.transactions
