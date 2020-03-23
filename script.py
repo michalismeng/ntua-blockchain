@@ -68,25 +68,24 @@ rx.combine_latest(
 def execute(n,s):
     if s == 'exit':
         os._exit(0)
-    elif s == 'UTXO':
-        print(n.get_UTXO())
-    elif s == 'UTXOS':
-        print(n.get_UTXOS())
+    elif s == 'utxos':
+        print(n.get_node_UTXOS(n.id))
+    elif str.startswith(s, 'balance'):
+        values = s.split(' ')
+        if len(values) == 1:        # if no argument is supplied, assume current node balance is requested
+            values.append(n.id)
+
+        for id in values[1:]:
+            print('Balance of node {}: {}'.format(id, n.get_node_balance(int(id))))
+    elif s == 'all_utxos':
+        print(n.get_all_UTXOS())
     elif s == 'CHAIN':
         print(n.chain.chain)
     elif s == 'BLOCK':
         print(n.current_block)
     elif 't' in s:
-        _, addres, amount = s.split(' ')
-        UTXOS,cash = n.get_suffisient_UTXOS(int(amount))
-        t = transaction.Transaction(n.wallet.address,
-                                    list(filter(lambda p: p[1] == int(addres),n.ring))[0][2],
-                                    int(amount),
-                                    cash,
-                                    UTXOS)
-        t.sign_transaction(n.wallet.private_key)
-        broadcast(n.get_hosts(), 'add-transaction', { 'transaction': t })
-    
+        _, id, amount = s.split(' ')
+        do_transaction(n, n.ring[int(id)][2], int(amount))
 
 rx.combine_latest(
     nodeS,
@@ -120,19 +119,18 @@ def register_node_to_ring(node, ip, port, public_key):
     print('adding node {}:{} to ring'.format(ip, port))
     bootstrap_node.ring.append((ip, port, public_key, {}))
 
+def do_transaction(sender_node, target_key, amount):
+    UTXO_ids, UTXO_sum = sender_node.get_suffisient_UTXOS(amount)
+    t = transaction.Transaction(sender_node.wallet.address, target_key, amount, UTXO_sum, UTXO_ids)
+    t.sign_transaction(sender_node.wallet.private_key)
+    broadcast(sender_node.get_hosts(), 'add-transaction', { 'transaction': t })
+
 def do_broadcast_ring():
     print('broadcating ring to all nodes...')
     broadcast(bootstrap_node.get_hosts(), 'get-ring', { 'ring': bootstrap_node.ring })
 
     for _, port, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
-        UTXOS,cash = bootstrap_node.get_suffisient_UTXOS(100)
-        t = transaction.Transaction(bootstrap_node.wallet.address,
-                                    public_key,
-                                    100,
-                                    cash,
-                                    UTXOS)
-        t.sign_transaction(bootstrap_node.wallet.private_key)
-        broadcast(bootstrap_node.get_hosts(), 'add-transaction', { 'transaction': t })
+        do_transaction(bootstrap_node, public_key, 100)
 
 
 # bootstrap node
@@ -174,7 +172,7 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
         node_count += 1
 
         return jsonify(response)
-    
+
     while True:
         x = input()
         commandS.on_next(x)
@@ -189,6 +187,8 @@ else:
     ip = sys.argv[1]
     port = int(sys.argv[2])
 
+    time.sleep(0.2)
+
     def current_node(): 
         global miner_node
         return miner_node
@@ -196,8 +196,6 @@ else:
     utils.startThreadedServer(app, ip, port)
     miner_node = utils.create_node(ip, port)
     nodeS.on_next(miner_node)
-
-
 
     while True:
         x = input()

@@ -11,19 +11,19 @@ class node:
         self.chain = None
 
         self.NBC = 0
-        self.id = id
+        self.id = int(id)
         self.wallet = wallet
         self.ip = ip
         self.port = port
         self.chain = BlockChain()
         self.lock = threading.Lock()
         self.current_block = []		# TODO: Imporve this
-        # here we store information for every node, as its id, its (ip:port) its public key and its balance
+        # here we store information for every node, as its id, its (ip:port) its public key and its UTXOS (sender address: receiver id, amount)
         self.ring = []
         self.current_node_count = len(self.ring)
 
     def get_suffisient_UTXOS(self, ammount):
-        UTXOS = list(filter(lambda x: x[2] == self.wallet.address, self.ring))[0][3]
+        UTXOS = self.get_node_UTXOS(self.id)
         t_ids = []
         balance = 0
         for id in UTXOS:
@@ -33,15 +33,16 @@ class node:
             t_ids.append(id)
         return t_ids, balance
 
-    def get_UTXO(self):
-        return list(filter(lambda x: x[2] == self.wallet.address, self.ring))[0][3]
+    def get_node_UTXOS(self, id):
+        _, _, _, utxos = self.ring[id]
+        return utxos
 
-    def get_UTXOS(self):
-        return list(map(lambda x: x[3], self.ring))
+    def get_all_UTXOS(self):
+        return [utxos for _, _, _, utxos in self.ring]
 
-    def balance(self, address):
-        UTXOS = list(filter(lambda x: x[2] == address, self.ring))[0][3]
-        return sum(map(lambda x: x[1], UTXOS.values()))
+    def get_node_balance(self, id):
+        UTXOS = self.get_node_UTXOS(id)
+        return sum([amount for _, amount in UTXOS.values()])
 
     def set_ring(self, ring):
         self.ring = ring
@@ -56,6 +57,11 @@ class node:
             return match[0]
         return 0
 
+    def address_to_id(self, address):
+        match = [id for id, (_, _, pkey, _) in enumerate(
+            self.ring) if pkey == address]
+        return match[0]
+
     # def create_new_block():
 
     # def create_transaction(sender, receiver, signature):
@@ -64,33 +70,38 @@ class node:
     # def broadcast_transaction():
 
     def validdate_transaction(self, t):
-        # use of signature and NBCs balance
         current_balance = 0
         if(t.receiver_address == t.sender_address):
             print('Cannot send transaction to self')
             return False
 
-        UTXOS_sed = list(
-            filter(lambda x: x[2] == t.sender_address, self.ring))[0][3]
+        UTXOS_sender = self.get_node_UTXOS(
+            self.address_to_id(t.sender_address))
+        UTXOS_receiver = self.get_node_UTXOS(
+            self.address_to_id(t.receiver_address))
+
         for id in t.transaction_inputs:
-            if id in UTXOS_sed:
-                current_balance += UTXOS_sed[id][1]
+            if id in UTXOS_sender:
+                current_balance += UTXOS_sender[id][1]
             else:
                 print('Input not found')
                 return False
+
         if current_balance < t.amount:
             print('Amount not found')
             return False
+
         for id in t.transaction_inputs:
-            del UTXOS_sed[id]
-        UTXOS_sed[t.transaction_id] = (
+            del UTXOS_sender[id]
+
+        UTXOS_sender[t.transaction_id] = (
             t.sender_address, t.transaction_outputs[1]['amount'])
-        UTXOS_reciv = list(
-            filter(lambda x: x[2] == t.receiver_address, self.ring))[0][3]
-        UTXOS_reciv[t.transaction_id] = (t.receiver_address, t.amount)
+        UTXOS_receiver[t.transaction_id] = (
+            t.receiver_address, t.transaction_outputs[0]['amount'])
+
         return True
 
-    def add_transaction_to_block(self,t):
+    def add_transaction_to_block(self, t):
         self.current_block.append(t)
         # self.lock.acquire()
         # if len(self.current_block) >= settings.capacity:
@@ -103,10 +114,10 @@ class node:
         #     new_block.set_nonce(self.mine_block(new_block))
         #     self.chain.add_block(new_block)
         # self.lock.release()
-        #TODO:mine
-    	#if enough transactions  mine
+        # TODO:mine
+        # if enough transactions  mine
 
-    def mine_block(self,b):
+    def mine_block(self, b):
         return 0
 
     # def broadcast_block():
@@ -119,4 +130,3 @@ class node:
     # 	#check for the longer chain accroose all nodes
     # def resolve_conflicts(self):
     # 	#resolve correct chain
-

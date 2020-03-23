@@ -28,7 +28,7 @@ class Transaction:
 
 
     def __myHash__(self):
-        hashString = jp.encode((self.sender_address, self.receiver_address, self.amount))
+        hashString = jp.encode((self.sender_address, self.receiver_address, self.amount, self.transaction_inputs))
         return SHA.new(hashString.encode())
 
     def sign_transaction(self, private_key):
