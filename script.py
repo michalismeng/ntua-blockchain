@@ -22,11 +22,11 @@ import threading
 import os
 
 # uncomment to disable FLASK messages
-# import logging
-# log = logging.getLogger('werkzeug')
-# log.setLevel(logging.ERROR)
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
-# thread_pool = ThreadPoolScheduler(5)
+# thread_pool = rx.scheduler.ThreadPoolScheduler(5)
 # new_thread = NewThreadScheduler()
 
 # transaction subject
@@ -55,9 +55,9 @@ rx.combine_latest(
     nodeS,
     tsxS
 ).pipe(
-    # ops.observe_on(rx.scheduler.ThreadPoolScheduler(1)),
+    ops.observe_on(rx.scheduler.ThreadPoolScheduler(1)),
     # ops.do_action(lambda x: print(threading.currentThread().name)),
-    ops.delay(1),
+    
     ops.map(lambda nl: { 'node': current_node(), 'tx': nl[1] }),
     ops.filter(lambda o: o['tx'].verify_transaction()),
     ops.filter(lambda o: o['node'].validdate_transaction(o['tx'])),
@@ -81,12 +81,12 @@ def execute(n,s):
                                     n.get_suffisient_UTXOS(int(amount)))
         t.sign_transaction(n.wallet.private_key)
         broadcast(n.get_hosts(), 'add-transaction', { 'transaction': t })
-        print("exiting broadcast")
-
 
 rx.combine_latest(
     nodeS,
     commandS
+).pipe(
+    ops.observe_on(rx.scheduler.ThreadPoolScheduler(1))
 ).subscribe(
     lambda x: execute(x[0],x[1])
 )
@@ -105,7 +105,6 @@ def update_ring():
 @app.route('/add-transaction', methods=['POST'])
 def add_transaction():
     args = jp.decode(request.data)
-    print(args)
     tsxS.on_next(args['transaction'])
     return jsonify('OK')
 
