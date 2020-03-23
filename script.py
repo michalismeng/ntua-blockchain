@@ -61,7 +61,7 @@ rx.combine_latest(
     ops.map(lambda nl: { 'node': current_node(), 'tx': nl[1] }),
     ops.filter(lambda o: o['tx'].verify_transaction()),
     ops.filter(lambda o: o['node'].validdate_transaction(o['tx'])),
-    ops.do_action(lambda o: o['node'].current_block.append(o['tx'])),
+    ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node'])))
 ).subscribe()
 
@@ -72,15 +72,21 @@ def execute(n,s):
         print(n.get_UTXO())
     elif s == 'UTXOS':
         print(n.get_UTXOS())
+    elif s == 'CHAIN':
+        print(n.chain.chain)
+    elif s == 'BLOCK':
+        print(n.current_block)
     elif 't' in s:
         _, addres, amount = s.split(' ')
+        UTXOS,cash = n.get_suffisient_UTXOS(int(amount))
         t = transaction.Transaction(n.wallet.address,
                                     list(filter(lambda p: p[1] == int(addres),n.ring))[0][2],
                                     int(amount),
-                                    n.balance(n.wallet.address),
-                                    n.get_suffisient_UTXOS(int(amount)))
+                                    cash,
+                                    UTXOS)
         t.sign_transaction(n.wallet.private_key)
         broadcast(n.get_hosts(), 'add-transaction', { 'transaction': t })
+    
 
 rx.combine_latest(
     nodeS,
@@ -119,11 +125,12 @@ def do_broadcast_ring():
     broadcast(bootstrap_node.get_hosts(), 'get-ring', { 'ring': bootstrap_node.ring })
 
     for _, port, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
+        UTXOS,cash = bootstrap_node.get_suffisient_UTXOS(100)
         t = transaction.Transaction(bootstrap_node.wallet.address,
                                     public_key,
                                     100,
-                                    bootstrap_node.balance(bootstrap_node.wallet.address),
-                                    bootstrap_node.get_suffisient_UTXOS(100))
+                                    cash,
+                                    UTXOS)
         t.sign_transaction(bootstrap_node.wallet.private_key)
         broadcast(bootstrap_node.get_hosts(), 'add-transaction', { 'transaction': t })
 

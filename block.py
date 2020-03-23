@@ -28,5 +28,8 @@ class Block:
 	def add_transaction(self, transaction):
 		self.transactions.append(transaction)
 	
+	def set_nonce(self,nonce):
+		self.nonce = nonce
+
 	def is_full(self):
 		return len(self.transactions) >= settings.capacity

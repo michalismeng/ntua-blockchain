@@ -1,7 +1,10 @@
 import block
 import wallet
 from blockchain import BlockChain
-
+import settings
+import threading
+from collections import deque
+from copy import deepcopy
 
 class node:
     def __init__(self, id, ip, port, wallet):
@@ -13,14 +16,14 @@ class node:
         self.ip = ip
         self.port = port
         self.chain = BlockChain()
+        self.lock = threading.Lock()
         self.current_block = []		# TODO: Imporve this
         # here we store information for every node, as its id, its (ip:port) its public key and its balance
         self.ring = []
         self.current_node_count = len(self.ring)
 
     def get_suffisient_UTXOS(self, ammount):
-        UTXOS = list(filter(lambda x: x[2] == self.wallet.address, self.ring))[
-            0][3]
+        UTXOS = list(filter(lambda x: x[2] == self.wallet.address, self.ring))[0][3]
         t_ids = []
         balance = 0
         for id in UTXOS:
@@ -28,7 +31,7 @@ class node:
                 break
             balance += UTXOS[id][1]
             t_ids.append(id)
-        return t_ids
+        return t_ids, balance
 
     def get_UTXO(self):
         return list(filter(lambda x: x[2] == self.wallet.address, self.ring))[0][3]
@@ -87,10 +90,24 @@ class node:
         UTXOS_reciv[t.transaction_id] = (t.receiver_address, t.amount)
         return True
 
-    # def add_transaction_to_block():
-    # 	#if enough transactions  mine
+    def add_transaction_to_block(self,t):
+        self.current_block.append(t)
+        # self.lock.acquire()
+        # if len(self.current_block) >= settings.capacity:
+        #     temp_block = deepcopy(self.current_block[:settings.capacity])
+        #     print(self.chain.chain[-1])
+        #     new_block = block.Block(self.chain.chain[-1].index, self.chain.chain[-1].current_hash)
+        #     print(new_block)
+        #     while not new_block.is_full():
+        #         new_block.add_transaction(temp_block.pop())
+        #     new_block.set_nonce(self.mine_block(new_block))
+        #     self.chain.add_block(new_block)
+        # self.lock.release()
+        #TODO:mine
+    	#if enough transactions  mine
 
-    # def mine_block():
+    def mine_block(self,b):
+        return 0
 
     # def broadcast_block():
 
