@@ -3,6 +3,7 @@
 import requests
 import node
 import wallet
+import block
 import sys
 import json
 from flask import Flask, jsonify, request, render_template
@@ -26,37 +27,89 @@ import logging
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-# thread_pool = rx.scheduler.ThreadPoolScheduler(5)
-# new_thread = NewThreadScheduler()
+thread_pool = rx.scheduler.ThreadPoolScheduler(1)
+
+def check_correct_running_thread():
+    if threading.currentThread().name != "ThreadPoolExecutor-0_0":
+        print('Subscription runs on wrong thread')
+        print('terminating...')
+        os._exit(0)
 
 # transaction subject
-tsxS = Subject()
+tsxS = ReplaySubject()
 
 # block subject
-blcS = Subject()
+blcS = ReplaySubject()
 
 # ring subject
-ringS = Subject()
+ringS = ReplaySubject(1)
 
 # node subject
-nodeS = Subject()
+nodeS = ReplaySubject(1)
 
 # command subject
-commandS = Subject()
+commandS = ReplaySubject()
 
-nodeS.subscribe(lambda miner: print("Created miner with id: ", miner.id))
+# dummy placeholder to allow transactions to happen
+genesisS = ReplaySubject()
 
+
+nodeS.pipe(ops.observe_on(thread_pool)).subscribe(lambda miner: print("Created miner with id: ", miner.id))
+
+def do_bootstrap_transactions(bootstrap_node):
+    for _, _, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
+        do_transaction(bootstrap_node, public_key, 100)
+
+rx.combine_latest(
+    nodeS,
+    genesisS
+).pipe(
+    ops.observe_on(thread_pool),
+    ops.do_action(lambda _: check_correct_running_thread()),
+
+    # run pipeline for bootstrap node only
+    ops.filter(lambda ng: ng[0].id == 0),
+    ops.do_action(lambda ng: do_bootstrap_transactions(ng[0]))
+).subscribe()
+
+# pipeline to detect genesis block
 rx.combine_latest(
     nodeS,
     blcS
 ).pipe(
-    ops.observe_on(rx.scheduler.ThreadPoolScheduler(1)),
-    # ops.do_action(lambda x: print(threading.currentThread().name)),
+    ops.observe_on(thread_pool),
+    ops.do_action(lambda _: check_correct_running_thread()),
+    
+    ops.map(lambda nb: { 'node': nb[0], 'bl': nb[1] }),
+    ops.filter(lambda o: o['bl'].previous_hash == 1),
+    ops.map(lambda o: { 'node': o['node'], 'bl': o['bl'], 'tsx': o['bl'].transactions[0] }),
+
+    # add genesis block to blockchain and 
+    ops.do_action(lambda o: o['node'].chain.add_block(o['bl'])),
+    ops.do_action(lambda o: o['node'].chain.set_utxos([{o['tsx'].transaction_id: (o['node'].ring[0][2], 100 * settings.N)}] + [{} for i in range(settings.N-1)])),
+    ops.do_action(lambda o: o['node'].set_all_utxos(o['node'].chain.UTXOS)),
+
+    ops.do_action(lambda o: print('Added genesis block to blockchain')),
+
+    # notify genesis is ready and allow transactions to happen
+    ops.do_action(lambda o: genesisS.on_next(0))
+).subscribe()
+
+# pipeline for normal block
+rx.combine_latest(
+    nodeS,
+    blcS
+).pipe(
+    ops.observe_on(thread_pool),
+    ops.do_action(lambda _: check_correct_running_thread()),
     
     ops.map(lambda nl: { 'node': nl[0], 'bl': nl[1] }),
+    ops.filter(lambda o: o['bl'].previous_hash != 1),
+
+
     # ops.filter(lambda o: o['bl'].verify_block()),
     ops.filter(lambda o: o['node'].validate_block(o['bl'])),
-    ops.do_action(lambda o: o['node'].add_block_to_chain(o['bl'])),
+    ops.do_action(lambda o: o['node'].chain.add_block(o['bl'])),
     ops.do_action(lambda o: o['node'].clear_current_block()),
     ops.do_action(lambda o: print('Received block: ', o['bl'].stringify()))
 ).subscribe()
@@ -65,8 +118,36 @@ rx.zip(
     nodeS, 
     ringS,
 ).pipe(
+    ops.observe_on(thread_pool),
+    ops.do_action(lambda _: check_correct_running_thread()),
+
     ops.do_action(lambda x: x[0].set_ring(x[1])),
     ops.do_action(lambda x: print('Current ring: ', x[0].get_hosts())),
+).subscribe()
+
+rx.combine_latest(
+    nodeS,
+    genesisS,
+    tsxS
+).pipe(
+    ops.observe_on(thread_pool),
+    ops.do_action(lambda _: check_correct_running_thread()),
+
+    ops.map(lambda nl: { 'node': nl[0], 'tx': nl[2] }),
+
+    ops.filter(lambda o: o['tx'].verify_transaction()),
+    ops.filter(lambda o: do_validdate_transaction(o['node'], o['tx'])),
+
+    ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
+    ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
+).subscribe()
+
+rx.combine_latest(
+    nodeS,
+    commandS
+).pipe(
+    ops.observe_on(rx.scheduler.ThreadPoolScheduler(1)),
+    ops.do_action(lambda x: execute(x[0], x[1]))
 ).subscribe()
 
 # def broadcast_needed(n,t):
@@ -74,25 +155,12 @@ rx.zip(
 #     if b != None:
 #         do_block(n,block = b)
 
-def do_validdate_transaction(n,t):
+def do_validdate_transaction(n, t):
     temp_UTXOS = n.validate_transaction(t, n.get_all_UTXOS())
     if temp_UTXOS == None:
         return False
     n.set_all_utxos(temp_UTXOS)
     return True
-
-rx.combine_latest(
-    nodeS,
-    tsxS
-).pipe(
-    ops.observe_on(rx.scheduler.ThreadPoolScheduler(1)),
-    # ops.do_action(lambda x: print(threading.currentThread().name)),
-    ops.map(lambda nl: { 'node': nl[0], 'tx': nl[1] }),
-    ops.filter(lambda o: o['tx'].verify_transaction()),
-    ops.filter(lambda o: do_validdate_transaction(o['node'],o['tx'])),
-    ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
-    ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx']))
-).subscribe()
 
 def execute(n,s):
     if s == 'exit':
@@ -120,14 +188,6 @@ def execute(n,s):
         b.transactions = n.current_block
         do_block(n, block=b)
 
-rx.combine_latest(
-    nodeS,
-    commandS
-).pipe(
-    ops.observe_on(rx.scheduler.ThreadPoolScheduler(1))
-).subscribe(
-    lambda x: execute(x[0],x[1])
-)
 
 app = Flask(__name__)
 def create_global_variable(name, value):
@@ -152,31 +212,23 @@ def add_block():
     blcS.on_next(args['block'])
     return jsonify('OK')
 
-def register_node_to_ring(node, ip, port, public_key):
-    # add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
-    # bottstrap node informs all other nodes and gives the request node an id and 100 NBCs
-    print('adding node {}:{} to ring'.format(ip, port))
-    bootstrap_node.ring.append((ip, port, public_key, {}))
-
 def do_transaction(sender_node, target_key, amount):
     UTXO_ids, UTXO_sum = sender_node.get_suffisient_UTXOS(amount)
     t = transaction.Transaction(sender_node.wallet.address, target_key, amount, UTXO_sum, UTXO_ids)
     t.sign_transaction(sender_node.wallet.private_key)
     broadcast(sender_node.get_hosts(), 'add-transaction', { 'transaction': t })
 
-def do_block(sender_node, address = None,block = None):
-    if block == None:
-        unicast(sender_node.address_to_host(address), 'add-block', { 'block': sender_node.chain.get_last_block()})
-    else:
-        broadcast(sender_node.get_hosts(), 'add-block', { 'block': block })
+def do_genesis_block():
+    gen_block = block.Block.genesis(bootstrap_node.wallet.address)
+    broadcast(bootstrap_node.get_hosts(), 'add-block', { 'block': gen_block })
+
+def do_block(sender_node, block):
+    broadcast(sender_node.get_hosts(), 'add-block', { 'block': block })
 
 def do_broadcast_ring():
     print('broadcating ring to all nodes...')
     broadcast(bootstrap_node.get_hosts(), 'get-ring', { 'ring': bootstrap_node.ring })
-
-    for _, _, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
-        do_block(bootstrap_node, public_key)
-        do_transaction(bootstrap_node, public_key, 100)
+    do_genesis_block()
 
 
 # bootstrap node
@@ -196,7 +248,7 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
     node_countS = ReplaySubject()
 
     node_countS.pipe(
-        ops.observe_on(rx.scheduler.ThreadPoolScheduler(2)),       # force usage of another thread, othrwise broadcast fails
+        ops.observe_on(thread_pool),       # force usage of another thread, othrwise broadcast fails
         ops.filter(lambda n: n == settings.N - 1),
     ).subscribe(lambda x: do_broadcast_ring())
 
@@ -210,7 +262,7 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
 
         args = jp.decode(request.data)
         ip, port, public_key = args['ip'], args['port'], args['public_key']
-        register_node_to_ring(node, ip, port, public_key)
+        utils.register_node_to_ring(current_node(), node, ip, port, public_key)
 
         response = { 'id': node_count }
         node_countS.on_next(node_count)
@@ -233,7 +285,7 @@ else:
     ip = sys.argv[1]
     port = int(sys.argv[2])
 
-    # time.sleep(2)
+    time.sleep(0.2)
 
     def current_node(): 
         global miner_node

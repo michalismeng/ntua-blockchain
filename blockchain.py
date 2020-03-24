@@ -15,6 +15,9 @@ class BlockChain:
     #         print('transaction not added')
     #         print(t.id)
     
+    def set_utxos(self, utxos):
+        self.UTXOS = utxos
+        
     def add_block(self,b):
         self.chain.append(b)
 

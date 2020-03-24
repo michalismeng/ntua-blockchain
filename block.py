@@ -16,8 +16,8 @@ class Block:
 
 	@staticmethod
 	def genesis(bootstrap_address):
-		b = Block(0,1,0)
-		b.add_transaction(Transaction(0,bootstrap_address,settings.N*100,settings.N*100,[]))
+		b = Block(0, 1, 0)
+		b.add_transaction(Transaction(0, bootstrap_address, settings.N * 100, settings.N * 100, []))
 		return b
 	
 	def __myHash__(self):
@@ -31,7 +31,7 @@ class Block:
 	def transaction_ids(self):
 		return [transaction.transaction_id for transaction in self.transactions]
 
-	def set_nonce(self,nonce):
+	def set_nonce(self, nonce):
 		self.nonce = nonce
 
 	def is_full(self):

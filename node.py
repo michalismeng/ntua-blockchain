@@ -39,6 +39,10 @@ class node:
     def get_all_UTXOS(self):
         return [utxos for _, _, _, utxos in self.ring]
 
+    def set_all_utxos(self, UTXOS):
+        self.ring = [(ring_entry[0], ring_entry[1], ring_entry[2], deepcopy(UTXO))
+                     for ring_entry, UTXO in zip(self.ring, UTXOS)]
+
     def get_node_balance(self, id):
         UTXOS = self.get_node_UTXOS(id)
         return sum([amount for _, amount in UTXOS.values()])
@@ -64,8 +68,6 @@ class node:
             self.ring) if pkey == address]
         return match[0]
 
-    def add_block_to_chain(self, b):
-        self.chain.add_block(b)
     # def create_new_block():
 
     # def create_transaction(sender, receiver, signature):
@@ -118,12 +120,8 @@ class node:
         return valid_transactions, temp_utxos
 
     def validate_block(self, new_block):
-        if self.chain.in_genesis_state():
-            # add genesis UTXOS by hand
-            genesis_UTXO = {'0': (self.ring[0][2], 100 * settings.N)}
-            genesis_UTXOS = [genesis_UTXO] + [{} for i in range(settings.N-1)]
-            self.chain.UTXOS = genesis_UTXOS
-            return True
+        print(self.chain.UTXOS)
+        print(new_block.transactions[0].transaction_inputs)
 
         valid_transactions, new_utxos = self.validate_transactions(new_block.transactions, self.chain.UTXOS)
         success = len(valid_transactions) == len(new_block.transactions)
@@ -136,10 +134,6 @@ class node:
             return True
         else:
             return False
-        
-    def set_all_utxos(self, UTXOS):
-        self.ring = [(ring_entry[0], ring_entry[1], ring_entry[2], UTXO)
-                     for ring_entry, UTXO in zip(self.ring, UTXOS)]
 
     def clear_current_block(self):
         # we clear our local current block (validated transaction pool)
