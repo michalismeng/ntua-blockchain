@@ -55,7 +55,7 @@ rx.combine_latest(
     
     ops.map(lambda nl: { 'node': nl[0], 'bl': nl[1] }),
     # ops.filter(lambda o: o['bl'].verify_block()),
-    ops.filter(lambda o: o['node'].validdate_block(o['bl'])),
+    ops.filter(lambda o: o['node'].validate_block(o['bl'])),
     ops.do_action(lambda o: o['node'].add_block_to_chain(o['bl'])),
     ops.do_action(lambda o: o['node'].clear_current_block()),
     ops.do_action(lambda o: print('Received block: ', o['bl'].stringify()))
@@ -69,16 +69,16 @@ rx.zip(
     ops.do_action(lambda x: print('Current ring: ', x[0].get_hosts())),
 ).subscribe()
 
-def broadcast_needed(n,t):
-    b = n.add_transaction_to_block(t)
-    if b != None:
-        do_block(n,block = b)
+# def broadcast_needed(n,t):
+#     b = n.add_transaction_to_block(t)
+#     if b != None:
+#         do_block(n,block = b)
 
 def do_validdate_transaction(n,t):
-    temp_UTXOS = n.validdate_transaction(t,n.get_all_UTXOS())
+    temp_UTXOS = n.validate_transaction(t, n.get_all_UTXOS())
     if temp_UTXOS == None:
         return False
-    n.update_ring(temp_UTXOS)
+    n.set_all_utxos(temp_UTXOS)
     return True
 
 rx.combine_latest(
@@ -91,7 +91,7 @@ rx.combine_latest(
     ops.filter(lambda o: o['tx'].verify_transaction()),
     ops.filter(lambda o: do_validdate_transaction(o['node'],o['tx'])),
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
-    ops.do_action(lambda o: broadcast_needed(o['node'],o['tx']))
+    ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx']))
 ).subscribe()
 
 def execute(n,s):
@@ -103,7 +103,6 @@ def execute(n,s):
         values = s.split(' ')
         if len(values) == 1:        # if no argument is supplied, assume current node balance is requested
             values.append(n.id)
-
         for id in values[1:]:
             print('Balance of node {}: {}'.format(id, n.get_node_balance(int(id))))
     elif s == 'all_utxos':
@@ -119,7 +118,7 @@ def execute(n,s):
         import block
         b = block.Block(1, 0, 0)
         b.transactions = n.current_block
-        do_block(n,block=b)
+        do_block(n, block=b)
 
 rx.combine_latest(
     nodeS,
@@ -165,7 +164,7 @@ def do_transaction(sender_node, target_key, amount):
     t.sign_transaction(sender_node.wallet.private_key)
     broadcast(sender_node.get_hosts(), 'add-transaction', { 'transaction': t })
 
-def do_block(sender_node,address = None,block = None):
+def do_block(sender_node, address = None,block = None):
     if block == None:
         unicast(sender_node.address_to_host(address), 'add-block', { 'block': sender_node.chain.get_last_block()})
     else:
