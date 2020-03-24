@@ -23,16 +23,22 @@ def doTheVar(x):
     theVar = x
     print('new vlaue for the var: ', theVar)
 
+def _raise():
+    raise Exception('Exception')
+
 p = ThreadPoolScheduler(1)
 
 xS.pipe(
     ops.observe_on(p),
     ops.do_action(lambda x: print('Commencing X pipe')),
     ops.do_action(lambda x: time.sleep(1)),
+    ops.do_action(lambda v: _raise()),
+    ops.retry(1),
     ops.do_action(lambda x: print('one second passed')),
     ops.do_action(lambda x: time.sleep(1)),
-    ops.do_action(lambda v: doTheVar(v))
-).subscribe(lambda x: print('Executing thread: ', threading.currentThread().name))
+    ops.do_action(lambda v: doTheVar(v)),
+    ops.do_action(lambda v: print('Executing thread: ', threading.currentThread().name))
+).subscribe()
 
 yS.pipe(
     ops.observe_on(p),

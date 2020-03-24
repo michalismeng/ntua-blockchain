@@ -8,13 +8,6 @@ class BlockChain:
         self.chain = []
         self.UTXOS = []
     
-    # def add_transaction(self,t):
-    #     if not(self.chain[-1].is_full()):
-    #         self.chain[-1].add_transaction(t)
-    #     else:
-    #         print('transaction not added')
-    #         print(t.id)
-    
     def set_utxos(self, utxos):
         self.UTXOS = utxos
         

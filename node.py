@@ -120,9 +120,6 @@ class node:
         return valid_transactions, temp_utxos
 
     def validate_block(self, new_block):
-        print(self.chain.UTXOS)
-        print(new_block.transactions[0].transaction_inputs)
-
         valid_transactions, new_utxos = self.validate_transactions(new_block.transactions, self.chain.UTXOS)
         success = len(valid_transactions) == len(new_block.transactions)
 
