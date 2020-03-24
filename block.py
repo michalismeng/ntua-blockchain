@@ -28,8 +28,15 @@ class Block:
 	def add_transaction(self, transaction):
 		self.transactions.append(transaction)
 	
+	def transaction_ids(self):
+		return [transaction.transaction_id for transaction in self.transactions]
+
 	def set_nonce(self,nonce):
 		self.nonce = nonce
 
 	def is_full(self):
 		return len(self.transactions) >= settings.capacity
+	
+	def stringify(self):
+	    return '({}, {}, {})'.format(self.index, self.previous_hash, self.current_hash)
+		

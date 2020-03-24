@@ -7,7 +7,7 @@ import sys
 import json
 from flask import Flask, jsonify, request, render_template
 
-from communication import broadcast
+from communication import broadcast, unicast
 from settings import bootstrap_ip, bootstrap_port
 import utils
 import settings
@@ -32,6 +32,9 @@ log.setLevel(logging.ERROR)
 # transaction subject
 tsxS = Subject()
 
+# block subject
+blcS = Subject()
+
 # ring subject
 ringS = Subject()
 
@@ -43,6 +46,21 @@ commandS = Subject()
 
 nodeS.subscribe(lambda miner: print("Created miner with id: ", miner.id))
 
+rx.combine_latest(
+    nodeS,
+    blcS
+).pipe(
+    ops.observe_on(rx.scheduler.ThreadPoolScheduler(1)),
+    # ops.do_action(lambda x: print(threading.currentThread().name)),
+    
+    ops.map(lambda nl: { 'node': nl[0], 'bl': nl[1] }),
+    # ops.filter(lambda o: o['bl'].verify_block()),
+    ops.filter(lambda o: o['node'].validdate_block(o['bl'])),
+    ops.do_action(lambda o: o['node'].add_block_to_chain(o['bl'])),
+    ops.do_action(lambda o: o['node'].clear_current_block()),
+    ops.do_action(lambda o: print('Received block: ', o['bl'].stringify()))
+).subscribe()
+
 rx.zip(
     nodeS, 
     ringS,
@@ -51,18 +69,29 @@ rx.zip(
     ops.do_action(lambda x: print('Current ring: ', x[0].get_hosts())),
 ).subscribe()
 
+def broadcast_needed(n,t):
+    b = n.add_transaction_to_block(t)
+    if b != None:
+        do_block(n,block = b)
+
+def do_validdate_transaction(n,t):
+    temp_UTXOS = n.validdate_transaction(t,n.get_all_UTXOS())
+    if temp_UTXOS == None:
+        return False
+    n.update_ring(temp_UTXOS)
+    return True
+
 rx.combine_latest(
     nodeS,
     tsxS
 ).pipe(
     ops.observe_on(rx.scheduler.ThreadPoolScheduler(1)),
     # ops.do_action(lambda x: print(threading.currentThread().name)),
-    
-    ops.map(lambda nl: { 'node': current_node(), 'tx': nl[1] }),
+    ops.map(lambda nl: { 'node': nl[0], 'tx': nl[1] }),
     ops.filter(lambda o: o['tx'].verify_transaction()),
-    ops.filter(lambda o: o['node'].validdate_transaction(o['tx'])),
-    ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
-    ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node'])))
+    ops.filter(lambda o: do_validdate_transaction(o['node'],o['tx'])),
+    ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
+    ops.do_action(lambda o: broadcast_needed(o['node'],o['tx']))
 ).subscribe()
 
 def execute(n,s):
@@ -79,13 +108,18 @@ def execute(n,s):
             print('Balance of node {}: {}'.format(id, n.get_node_balance(int(id))))
     elif s == 'all_utxos':
         print(n.get_all_UTXOS())
-    elif s == 'CHAIN':
-        print(n.chain.chain)
-    elif s == 'BLOCK':
-        print(n.current_block)
-    elif 't' in s:
+    elif s == 'chain':
+        print(n.chain.get_block_indexes())
+    elif s == 'block':
+        print(n.get_pending_transactions())
+    elif str.startswith(s, 't'):
         _, id, amount = s.split(' ')
         do_transaction(n, n.ring[int(id)][2], int(amount))
+    elif s == 's':
+        import block
+        b = block.Block(1, 0, 0)
+        b.transactions = n.current_block
+        do_block(n,block=b)
 
 rx.combine_latest(
     nodeS,
@@ -113,6 +147,12 @@ def add_transaction():
     tsxS.on_next(args['transaction'])
     return jsonify('OK')
 
+@app.route('/add-block', methods=['POST'])
+def add_block():
+    args = jp.decode(request.data)
+    blcS.on_next(args['block'])
+    return jsonify('OK')
+
 def register_node_to_ring(node, ip, port, public_key):
     # add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
     # bottstrap node informs all other nodes and gives the request node an id and 100 NBCs
@@ -125,11 +165,18 @@ def do_transaction(sender_node, target_key, amount):
     t.sign_transaction(sender_node.wallet.private_key)
     broadcast(sender_node.get_hosts(), 'add-transaction', { 'transaction': t })
 
+def do_block(sender_node,address = None,block = None):
+    if block == None:
+        unicast(sender_node.address_to_host(address), 'add-block', { 'block': sender_node.chain.get_last_block()})
+    else:
+        broadcast(sender_node.get_hosts(), 'add-block', { 'block': block })
+
 def do_broadcast_ring():
     print('broadcating ring to all nodes...')
     broadcast(bootstrap_node.get_hosts(), 'get-ring', { 'ring': bootstrap_node.ring })
 
-    for _, port, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
+    for _, _, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
+        do_block(bootstrap_node, public_key)
         do_transaction(bootstrap_node, public_key, 100)
 
 
@@ -187,7 +234,7 @@ else:
     ip = sys.argv[1]
     port = int(sys.argv[2])
 
-    time.sleep(0.2)
+    # time.sleep(2)
 
     def current_node(): 
         global miner_node
