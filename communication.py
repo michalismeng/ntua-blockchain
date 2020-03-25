@@ -15,14 +15,15 @@ def unicast(host, api, message):
 def broadcast(hosts, api, message):
     responses = []
     timeouts = []
-    message = jp.encode(message)
+    message = jp.encode(message, keys=True)
 
     for ip, port in hosts:
         try:
             response = requests.post('http://{}:{}/{}'.format(ip, port, api), message)
-            responses.append(response.status_code == 200)
+            responses.append(jp.decode(response.text, keys = True))
+            # print(jp.decode(response.text, keys = True))
 
         except requests.exceptions.Timeout:
             timeouts.append((ip, port))
     
-    return len(timeouts) == 0 and all(responses)
+    return responses

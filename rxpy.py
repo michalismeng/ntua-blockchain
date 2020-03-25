@@ -14,9 +14,9 @@ import time
 
 xS = ReplaySubject()
 yS = ReplaySubject()
+zS = Subject()
 
-
-theVar = 5
+theVar = 0
 
 def doTheVar(x):
     global theVar
@@ -55,9 +55,25 @@ def do_next():
     yS.on_next(20)
 
 
-threading.Thread(target=do_next).start()
+# threading.Thread(target=do_next).start()
+
+def cond(x):
+    return theVar != 5
+
+def inc_var():
+    global theVar
+    print(theVar)
+    theVar += 1
+
+zS.pipe(
+    ops.observe_on(p),
+    ops.do_action(lambda x: print(x)),
+    ops.do_while(lambda x: x <= 1),
+).subscribe(lambda x: print('ended'))
 
 print('I am over here')
+zS.on_next(0)
+zS.on_next(1)
 
 time.sleep(5)
 

@@ -3,18 +3,20 @@ import settings
 import jsonpickle as jp
 from copy import deepcopy
 from Crypto.Hash import SHA
+from blockchain_subjects import consensusS
 
 class BlockChain:
 
     def __init__(self):
         self.chain = []
-        self.UTXOS = []
+        self.UTXO_history = []
     
-    def set_utxos(self, utxos):
-        self.UTXOS = utxos
-        
-    def add_block(self,b):
+    def get_recent_UTXOS(self):
+        return self.UTXO_history[-1]
+
+    def add_block(self,b,utxos):
         self.chain.append(b)
+        self.UTXO_history.append(deepcopy(utxos))
 
     def get_last_block(self):
         return self.chain[-1]
@@ -32,10 +34,12 @@ class BlockChain:
         print('Invalid block.')
         if b.index > self.chain[-1].index:
             print('Consensus is needed.')
-            #do_consensus
-            pass
+            consensusS.on_next(0)
 
         #TODO: nonce check
         return False
-        
+    
+    def do_consensus(self, chains):
+        chains.sort(reverse = True,key = lambda x: len(x))
+        print(chains)
         

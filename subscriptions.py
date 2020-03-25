@@ -3,9 +3,10 @@ from rx import operators as ops
 import rx.scheduler
 
 from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions, do_transaction
-from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS
+from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS
 from cli import execute
 import settings
+from communication import broadcast
 
 # we define one common thread pool with one available thread to be used by all pipelines
 # this way they all run on the same thread => they are serialized and no concurrency control is required
@@ -76,9 +77,9 @@ rx.combine_latest(
     ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'tsx': o['bl'].transactions[0]}),
 
     # add genesis block to blockchain and configure utxos
-    ops.do_action(lambda o: o['node'].chain.add_block(o['bl'])),
-    ops.do_action(lambda o: o['node'].chain.set_utxos([{o['tsx'].transaction_id: (o['node'].ring[0][2], 100 * settings.N)}] + [{} for i in range(settings.N-1)])),
-    ops.do_action(lambda o: o['node'].set_all_utxos(o['node'].chain.UTXOS)),
+    ops.do_action(lambda o: o['node'].chain.add_block(o['bl'],
+        [{o['tsx'].transaction_id: (o['node'].ring[0][2], 100 * settings.N)}] + [{} for i in range(settings.N-1)])),
+    ops.do_action(lambda o: o['node'].set_all_utxos(o['node'].chain.get_recent_UTXOS())),
 
     ops.do_action(lambda o: print('Added genesis block to blockchain')),
 
@@ -99,8 +100,9 @@ rx.combine_latest(
     # check that this is not a genesis block
     ops.filter(lambda o: o['bl'].previous_hash != 1),
     ops.filter(lambda o: o['node'].chain.verify_block(o['bl'])),
-    ops.filter(lambda o: o['node'].validate_block(o['bl'])),
-    ops.do_action(lambda o: o['node'].chain.add_block(o['bl'])),
+    ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'utxos': o['node'].validate_block(o['bl'])}),
+    ops.filter(lambda o: o['utxos'] != None),
+    ops.do_action(lambda o: o['node'].chain.add_block(o['bl'],o['utxos'])),
     ops.do_action(lambda o: o['node'].clear_current_block()),
     ops.do_action(lambda o: print('Received block: ', o['bl'].stringify()))
 ).subscribe()
@@ -149,6 +151,18 @@ rx.combine_latest(
     ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
 
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
+).subscribe()
+
+rx.combine_latest(
+    nodeS,
+    consensusS
+).pipe(
+    ops.observe_on(blockchain_thread_pool),
+    ops.do_action(lambda _: check_correct_running_thread()),
+
+    ops.map(lambda nl: {'node': nl[0]}),
+    ops.map(lambda o: {'node': o['node'], 'chains': broadcast(o['node'].get_other_hosts(), 'request-chain', {})}),
+    ops.do_action(lambda o: o['node'].chain.do_consensus(o['chains']))
 ).subscribe()
 
 #

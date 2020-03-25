@@ -126,23 +126,22 @@ class node:
         return valid_transactions, temp_utxos
 
     def validate_block(self, new_block):
-        valid_transactions, new_utxos = self.validate_transactions(new_block.transactions, self.chain.UTXOS)
+        valid_transactions, new_utxos = self.validate_transactions(new_block.transactions, self.chain.get_recent_UTXOS())
         success = len(valid_transactions) == len(new_block.transactions)
 
         # if all transactions of the block are valid => update utxos
         # else failure
 
         if success:
-            self.chain.UTXOS = new_utxos
-            return True
+            return new_utxos
         else:
-            return False
+            return None
 
     def clear_current_block(self):
         # we clear our local current block (validated transaction pool)
         # based on the new blockchain, we keep only valid transactions in our current block and update our utxos accordingly 
 
-        valid_transactions, new_utxos = self.validate_transactions(self.current_block, self.chain.UTXOS)
+        valid_transactions, new_utxos = self.validate_transactions(self.current_block, self.chain.get_recent_UTXOS())
         self.current_block = valid_transactions
         self.set_all_utxos(new_utxos)
 

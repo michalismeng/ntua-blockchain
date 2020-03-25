@@ -6,7 +6,7 @@ import wallet
 import block
 import sys
 import json
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, make_response
 
 from communication import broadcast, unicast
 from settings import bootstrap_ip, bootstrap_port
@@ -49,6 +49,13 @@ def add_block():
     args = jp.decode(request.data)
     blcS.on_next(args['block'])
     return jsonify('OK')
+
+@app.route('/request-chain',methods=['POST'])
+def request_chain():
+    n = current_node()
+    response = make_response(jp.encode(n.chain.chain), 200)
+    response.mimetype = "text/plain"
+    return response
 
 # bootstrap node
 if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):

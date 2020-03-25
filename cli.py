@@ -2,6 +2,7 @@ from subscription_utils import do_transaction, do_block
 from blockchain_subjects import mytsxS
 import block
 import os
+from communication import unicast
 
 def execute(n, s):
     if s == 'exit':
@@ -18,11 +19,18 @@ def execute(n, s):
         print(n.get_all_UTXOS())
     elif s == 'chain':
         print(n.chain.get_block_indexes())
+        print(n.chain.get_recent_UTXOS())
     elif s == 'block':
         print(n.get_pending_transactions())
     elif str.startswith(s, 't'):
         _, id, amount = s.split(' ')
         mytsxS.on_next((n.ring[int(id)][2], int(amount)))
+    elif s.startswith('b'):
+        index = n.chain.get_last_block().index+1
+        hs = n.chain.get_last_block().current_hash
+        b = block.Block(index, hs, 0)
+        host = (n.ring[1][0], n.ring[1][1])
+        unicast(host, 'add-block', { 'block': b })
     elif s.startswith('s'):
         values = s.split(' ')
         if len(values) == 1:
