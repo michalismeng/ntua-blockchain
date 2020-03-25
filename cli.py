@@ -23,7 +23,13 @@ def execute(n, s):
     elif str.startswith(s, 't'):
         _, id, amount = s.split(' ')
         mytsxS.on_next((n.ring[int(id)][2], int(amount)))
-    elif s == 's':
-        b = block.Block(1, 0, 0)
+    elif s.startswith('s'):
+        values = s.split(' ')
+        if len(values) == 1:
+            values.append(n.chain.get_last_block().index+1)
+        if len(values) == 2:
+            values.append(n.chain.get_last_block().current_hash)
+        _, index, hs = values
+        b = block.Block(index, hs, 0)
         b.transactions = n.current_block
         do_block(n, b)

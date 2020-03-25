@@ -98,8 +98,7 @@ rx.combine_latest(
 
     # check that this is not a genesis block
     ops.filter(lambda o: o['bl'].previous_hash != 1),
-
-    # # ops.filter(lambda o: o['bl'].verify_block()),
+    ops.filter(lambda o: o['node'].chain.verify_block(o['bl'])),
     ops.filter(lambda o: o['node'].validate_block(o['bl'])),
     ops.do_action(lambda o: o['node'].chain.add_block(o['bl'])),
     ops.do_action(lambda o: o['node'].clear_current_block()),

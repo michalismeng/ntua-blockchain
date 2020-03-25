@@ -3,16 +3,17 @@ import time
 import settings
 from transaction import Transaction
 from Crypto.Hash import SHA
+import jsonpickle as jp
 
 
 class Block:
 	def __init__(self, index, previous_hash, nonce = None):
-		self.index = index
+		self.index = int(index)
 		self.timestamp = time.time()
 		self.transactions = []
 		self.nonce = nonce
 		self.previous_hash = previous_hash
-		self.current_hash = self.__myHash__()
+		self.current_hash = str(self.__myHash__().hexdigest())
 
 	@staticmethod
 	def genesis(bootstrap_address):
@@ -21,7 +22,7 @@ class Block:
 		return b
 	
 	def __myHash__(self):
-		hashString = "%s%s%s" % (self.index, self.previous_hash.hexdigest() if not(isinstance(self.previous_hash,int)) else str(self.previous_hash), self.nonce) 
+		hashString = jp.encode((self.index,self.timestamp,self.transactions,self.nonce,self.previous_hash))
 		return SHA.new(hashString.encode())
 
 	# transaction and block capacity must have already been validated
