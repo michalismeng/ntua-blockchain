@@ -56,6 +56,9 @@ class node:
     def get_hosts(self):
         return [(ip, port) for ip, port, _, _ in self.ring]
 
+    def get_other_hosts(self):
+        return [(ip, port) for ind, (ip, port, _, _) in enumerate(self.ring) if ind != self.id]
+
     def address_to_host(self, address):
         match = [(ip, port)
                  for ip, port, pkey, _ in self.ring if pkey == address]
@@ -75,10 +78,11 @@ class node:
 
     # def broadcast_transaction():
 
-    def validate_transaction(self, t, UTXOS):
+    def validate_transaction(self, t, UTXOS, verbose = False):
         current_balance = 0
         if(t.receiver_address == t.sender_address):
-            print('Cannot send transaction to self')
+            if verbose:
+                print('Cannot send transaction to self')
             return None
 
         UTXOS_sender = UTXOS[
@@ -90,11 +94,13 @@ class node:
             if id in UTXOS_sender:
                 current_balance += UTXOS_sender[id][1]
             else:
-                print('Input not found')
+                if verbose:
+                    print('Input not found')
                 return None
 
         if current_balance < t.amount:
-            print('Amount not found')
+            if verbose:
+                print('Amount not found')
             return None
 
         for id in t.transaction_inputs:

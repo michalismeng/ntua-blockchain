@@ -26,4 +26,3 @@ def broadcast(hosts, api, message):
             timeouts.append((ip, port))
     
     return len(timeouts) == 0 and all(responses)
-

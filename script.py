@@ -96,7 +96,7 @@ else:
     ip = sys.argv[1]
     port = int(sys.argv[2])
 
-    time.sleep(0.2)
+    # time.sleep(0.2)
 
     def current_node(): 
         global miner_node

@@ -1,4 +1,5 @@
 from subscription_utils import do_transaction, do_block
+from blockchain_subjects import mytsxS
 import block
 import os
 
@@ -21,7 +22,7 @@ def execute(n, s):
         print(n.get_pending_transactions())
     elif str.startswith(s, 't'):
         _, id, amount = s.split(' ')
-        do_transaction(n, n.ring[int(id)][2], int(amount))
+        mytsxS.on_next((n.ring[int(id)][2], int(amount)))
     elif s == 's':
         b = block.Block(1, 0, 0)
         b.transactions = n.current_block

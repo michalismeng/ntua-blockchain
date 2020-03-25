@@ -20,3 +20,6 @@ commandS = Subject()
 
 # genesis block subject
 genesisS = Subject()
+
+# my transaction subject
+mytsxS = Subject()

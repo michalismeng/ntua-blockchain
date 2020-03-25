@@ -2,8 +2,8 @@ import rx
 from rx import operators as ops
 import rx.scheduler
 
-from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions
-from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, commandS
+from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions, do_transaction
+from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS
 from cli import execute
 import settings
 
@@ -120,7 +120,7 @@ rx.combine_latest(
     # verify transaction signature then calculate new utxos. If valid (not None) then update node utxos 
     ops.filter(lambda o: o['tx'].verify_transaction()),
 
-    ops.map(lambda o: {'node': o['node'], 'tx': o['tx'], 'new_utxos': o['node'].validate_transaction(o['tx'], o['utxos'])}),
+    ops.map(lambda o: {'node': o['node'], 'tx': o['tx'], 'new_utxos': o['node'].validate_transaction(o['tx'], o['utxos'], True)}),
     ops.filter(lambda o: o['new_utxos'] != None),
 
     ops.do_action(lambda o: o['node'].set_all_utxos(o['new_utxos'])),
@@ -129,6 +129,28 @@ rx.combine_latest(
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
 ).subscribe()
 
+# pipeline for my transactions
+rx.combine_latest(
+    nodeS,
+    mytsxS
+).pipe(
+    ops.observe_on(blockchain_thread_pool),
+    ops.do_action(lambda _: check_correct_running_thread()),
+
+    ops.map(lambda nl: {'node': nl[0], 'target': nl[1][0], 'amount': nl[1][1]}),
+    ops.map(lambda o: {'node': o['node'], 'tx': do_transaction(o['node'],o['target'],o['amount']), 'utxos': o['node'].get_all_UTXOS()}),
+
+    # verify transaction signature then calculate new utxos. If valid (not None) then update node utxos 
+    ops.filter(lambda o: o['tx'].verify_transaction()),
+
+    ops.map(lambda o: {'node': o['node'], 'tx': o['tx'], 'new_utxos': o['node'].validate_transaction(o['tx'], o['utxos'], True)}),
+    ops.filter(lambda o: o['new_utxos'] != None),
+
+    ops.do_action(lambda o: o['node'].set_all_utxos(o['new_utxos'])),
+    ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
+
+    ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
+).subscribe()
 
 #
 #   CLI PIPELINES

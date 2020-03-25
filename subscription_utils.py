@@ -4,7 +4,7 @@ import os
 import block
 import transaction
 from communication import broadcast
-
+from blockchain_subjects import mytsxS
 import time
 
 # debug function to ensure all subscriptions run on the same thread
@@ -17,14 +17,14 @@ def check_correct_running_thread():
 # execute first N - 1 transactions to all node except the bootstrap node
 def do_bootstrap_transactions(bootstrap_node):
     for _, _, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
-        do_transaction(bootstrap_node, public_key, 100)
+        mytsxS.on_next((public_key, 100))
 
 def do_transaction(sender_node, target_key, amount):
-    print(sender_node.get_suffisient_UTXOS(amount))
     UTXO_ids, UTXO_sum = sender_node.get_suffisient_UTXOS(amount)
     t = transaction.Transaction(sender_node.wallet.address, target_key, amount, UTXO_sum, UTXO_ids)
     t.sign_transaction(sender_node.wallet.private_key)
-    broadcast(sender_node.get_hosts(), 'add-transaction', { 'transaction': t })
+    broadcast(sender_node.get_other_hosts(), 'add-transaction', { 'transaction': t })
+    return t
 
 def do_genesis_block(bootstrap_node):
     gen_block = block.Block.genesis(bootstrap_node.wallet.address)
