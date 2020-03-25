@@ -92,14 +92,14 @@ rx.combine_latest(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
 
-    ops.map(lambda nl: { 'node': nl[0], 'bl': nl[2] }),
+    ops.map(lambda nl: { 'node': nl[0], 'bl': nl[1] }),
 
     ops.filter(lambda o: o['bl'].previous_hash != 1),           # check that this is not a genesis block
 
     # # ops.filter(lambda o: o['bl'].verify_block()),
-    # ops.filter(lambda o: o['node'].validate_block(o['bl'])),
-    # ops.do_action(lambda o: o['node'].chain.add_block(o['bl'])),
-    # ops.do_action(lambda o: o['node'].clear_current_block()),
+    ops.filter(lambda o: o['node'].validate_block(o['bl'])),
+    ops.do_action(lambda o: o['node'].chain.add_block(o['bl'])),
+    ops.do_action(lambda o: o['node'].clear_current_block()),
     ops.do_action(lambda o: print('Received block: ', o['bl'].stringify()))
 ).subscribe()
 

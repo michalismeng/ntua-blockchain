@@ -5,9 +5,10 @@ import block
 import transaction
 from communication import broadcast
 
+import time
+
 # debug function to ensure all subscriptions run on the same thread
 def check_correct_running_thread():
-    return
     if threading.currentThread().name != "ThreadPoolExecutor-0_0":
         print('Subscription runs on wrong thread')
         print('terminating...')
@@ -26,6 +27,7 @@ def do_bootstrap_transactions(bootstrap_node):
         do_transaction(bootstrap_node, public_key, 100)
 
 def do_transaction(sender_node, target_key, amount):
+    print(sender_node.get_suffisient_UTXOS(amount))
     UTXO_ids, UTXO_sum = sender_node.get_suffisient_UTXOS(amount)
     t = transaction.Transaction(sender_node.wallet.address, target_key, amount, UTXO_sum, UTXO_ids)
     t.sign_transaction(sender_node.wallet.private_key)
