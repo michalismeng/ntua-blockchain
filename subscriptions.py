@@ -2,7 +2,7 @@ import rx
 from rx import operators as ops
 import rx.scheduler
 
-from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions, do_validate_transaction
+from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions
 from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, commandS
 from cli import execute
 import settings
@@ -19,7 +19,7 @@ cli_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
 # node pipeline - the first to be executed
 nodeS.pipe(
     ops.observe_on(blockchain_thread_pool),
-    
+
     ops.do_action(lambda miner: print("Created miner with id: ", miner.id))
 ).subscribe()
 
@@ -28,8 +28,8 @@ rx.combine_latest(
     nodeS,
     node_countS
 ).pipe(
-    ops.observe_on(rx.scheduler.ThreadPoolScheduler(1)),
-    ops.map(lambda nc: { 'boot_node': nc[0], 'count': nc[1] }),
+    ops.observe_on(blockchain_thread_pool),
+    ops.map(lambda nc: {'boot_node': nc[0], 'count': nc[1]}),
 
     ops.filter(lambda o: o['count'] == settings.N - 1),
     ops.do_action(lambda o: do_broadcast_ring(o['boot_node']))
@@ -37,7 +37,7 @@ rx.combine_latest(
 
 # ring pipeline
 rx.zip(
-    nodeS, 
+    nodeS,
     ringS,
 ).pipe(
     ops.observe_on(blockchain_thread_pool),
@@ -68,10 +68,12 @@ rx.combine_latest(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
 
-    ops.map(lambda nb: { 'node': nb[0], 'bl': nb[1] }),
-    ops.filter(lambda o: o['bl'].previous_hash == 1),               # check if this is a genesis block
-    ops.filter(lambda o: o['node'].chain.in_genesis_state()),       # check that this is the first (and only) genesis block to arrive
-    ops.map(lambda o: { 'node': o['node'], 'bl': o['bl'], 'tsx': o['bl'].transactions[0] }),
+    ops.map(lambda nb: {'node': nb[0], 'bl': nb[1]}),
+    # check if this is a genesis block
+    ops.filter(lambda o: o['bl'].previous_hash == 1),
+    # check that this is the first (and only) genesis block to arrive
+    ops.filter(lambda o: o['node'].chain.in_genesis_state()),
+    ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'tsx': o['bl'].transactions[0]}),
 
     # add genesis block to blockchain and configure utxos
     ops.do_action(lambda o: o['node'].chain.add_block(o['bl'])),
@@ -92,9 +94,10 @@ rx.combine_latest(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
 
-    ops.map(lambda nl: { 'node': nl[0], 'bl': nl[1] }),
+    ops.map(lambda nl: {'node': nl[0], 'bl': nl[1]}),
 
-    ops.filter(lambda o: o['bl'].previous_hash != 1),           # check that this is not a genesis block
+    # check that this is not a genesis block
+    ops.filter(lambda o: o['bl'].previous_hash != 1),
 
     # # ops.filter(lambda o: o['bl'].verify_block()),
     ops.filter(lambda o: o['node'].validate_block(o['bl'])),
@@ -112,13 +115,18 @@ rx.combine_latest(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
 
-    ops.map(lambda nl: { 'node': nl[0], 'tx': nl[2] }),
+    ops.map(lambda nl: {'node': nl[0], 'tx': nl[2], 'utxos': nl[0].get_all_UTXOS()}),
 
+    # verify transaction signature then calculate new utxos. If valid (not None) then update node utxos 
     ops.filter(lambda o: o['tx'].verify_transaction()),
-    ops.filter(lambda o: do_validate_transaction(o['node'], o['tx'])),
+
+    ops.map(lambda o: {'node': o['node'], 'tx': o['tx'], 'new_utxos': o['node'].validate_transaction(o['tx'], o['utxos'])}),
+    ops.filter(lambda o: o['new_utxos'] != None),
+
+    ops.do_action(lambda o: o['node'].set_all_utxos(o['new_utxos'])),
+    ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
 
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
-    ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
 ).subscribe()
 
 

@@ -14,13 +14,6 @@ def check_correct_running_thread():
         print('terminating...')
         os._exit(0)
 
-def do_validate_transaction(n, t):
-    temp_UTXOS = n.validate_transaction(t, n.get_all_UTXOS())
-    if temp_UTXOS == None:
-        return False
-    n.set_all_utxos(temp_UTXOS)
-    return True
-
 # execute first N - 1 transactions to all node except the bootstrap node
 def do_bootstrap_transactions(bootstrap_node):
     for _, _, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
