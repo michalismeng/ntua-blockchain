@@ -100,7 +100,7 @@ rx.combine_latest(
     # check that this is not a genesis block
     ops.filter(lambda o: o['bl'].previous_hash != 1),
     ops.filter(lambda o: o['node'].chain.verify_block(o['bl'])),
-    ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'utxos': o['node'].validate_block(o['bl'])}),
+    ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'utxos': o['node'].validate_block(o['bl'],o['node'].chain.get_recent_UTXOS())}),
     ops.filter(lambda o: o['utxos'] != None),
     ops.do_action(lambda o: o['node'].chain.add_block(o['bl'],o['utxos'])),
     ops.do_action(lambda o: o['node'].clear_current_block()),
@@ -162,7 +162,9 @@ rx.combine_latest(
 
     ops.map(lambda nl: {'node': nl[0]}),
     ops.map(lambda o: {'node': o['node'], 'chains': broadcast(o['node'].get_other_hosts(), 'request-chain', {})}),
-    ops.do_action(lambda o: o['node'].chain.do_consensus(o['chains']))
+    ops.do_action(lambda o: o['chains'].sort(reverse = True,key = lambda x: len(x))),
+    ops.map(lambda o: {'utxos':o['node'].validate_chain(o['chains'][0][1:],1)}),
+    ops.do_action(lambda o: print(o['utxos'])),
 ).subscribe()
 
 #

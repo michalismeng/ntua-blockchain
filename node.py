@@ -125,8 +125,8 @@ class node:
 
         return valid_transactions, temp_utxos
 
-    def validate_block(self, new_block):
-        valid_transactions, new_utxos = self.validate_transactions(new_block.transactions, self.chain.get_recent_UTXOS())
+    def validate_block(self, new_block, UTXOS):
+        valid_transactions, new_utxos = self.validate_transactions(new_block.transactions, UTXOS)
         success = len(valid_transactions) == len(new_block.transactions)
 
         # if all transactions of the block are valid => update utxos
@@ -167,6 +167,21 @@ class node:
 
     def mine_block(self, b):
         return 0
+
+    def validate_chain(self, blocks, index):
+        # chains.sort(reverse = True,key = lambda x: len(x))
+        # hashes = list(map(lambda chain: list(map(lambda block: block.current_hash,chain)),chains))
+        max_common_index = self.chain.get_max_prefex_chain(blocks,index)
+
+        temp_UTXOS = [self.chain.UTXO_history[index+max_common_index-1]]
+
+        for block in blocks[max_common_index:]:
+            new_UTXOS = self.validate_block(block,temp_UTXOS[-1])
+            if new_UTXOS == None:
+                return None
+            temp_UTXOS.append(new_UTXOS)
+        
+        return temp_UTXOS[1:]
 
     # def broadcast_block():
 

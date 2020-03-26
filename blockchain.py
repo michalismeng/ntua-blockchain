@@ -39,7 +39,14 @@ class BlockChain:
         #TODO: nonce check
         return False
     
-    def do_consensus(self, chains):
-        chains.sort(reverse = True,key = lambda x: len(x))
-        print(chains)
+    def chain_to_hashes(self):
+        return [block.current_hash for block in self.chain]
+
+    def get_max_prefex_chain(self, blocks, index):
+        a = [my_block.current_hash != other_block.current_hash for my_block, other_block in zip(self.chain[index:], blocks)]
+        return a.index(max(a))
+
+
+
+
         

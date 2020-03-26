@@ -19,7 +19,7 @@ def execute(n, s):
         print(n.get_all_UTXOS())
     elif s == 'chain':
         print(n.chain.get_block_indexes())
-        print(n.chain.get_recent_UTXOS())
+        print(n.chain.UTXO_history)
     elif s == 'block':
         print(n.get_pending_transactions())
     elif str.startswith(s, 't'):
