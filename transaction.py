@@ -43,3 +43,7 @@ class Transaction:
 
     def stringify(self, node):
 	    return '({}, {}, {})'.format(node.address_to_host(self.sender_address), node.address_to_host(self.receiver_address), self.amount)
+
+    def __hash__(self):
+        return self.transaction_id
+

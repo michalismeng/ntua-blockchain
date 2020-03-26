@@ -2,7 +2,7 @@ import rx
 from rx import operators as ops
 import rx.scheduler
 
-from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions, do_transaction
+from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions, create_transaction
 from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS
 from cli import execute
 import settings
@@ -139,8 +139,10 @@ rx.combine_latest(
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nl: {'node': nl[0], 'target': nl[1][0], 'amount': nl[1][1]}),
-    ops.map(lambda o: {'node': o['node'], 'tx': do_transaction(o['node'],o['target'],o['amount']), 'utxos': o['node'].get_all_UTXOS()}),
+    ops.map(lambda o: {'node': o['node'], 'tx': create_transaction(o['node'],o['target'],o['amount']), 'utxos': o['node'].get_all_UTXOS()}),
 
+    ops.do_action(lambda o: broadcast(o['node'].get_other_hosts(), 'add-transaction', { 'transaction': o['tx'] })),
+    
     # verify transaction signature then calculate new utxos. If valid (not None) then update node utxos 
     ops.filter(lambda o: o['tx'].verify_transaction()),
 
@@ -153,6 +155,48 @@ rx.combine_latest(
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
 ).subscribe()
 
+def consesus_succedeed(node, branch_index, utxo_history, chain, transactions):
+    new_chain = node.chain.chain[:branch_index] + chain[-len(utxo_history):]
+    new_utxos = node.chain.UTXO_history[:branch_index] +  utxo_history
+
+    my_transactions = []
+
+    for b in node.chain.chain[branch_index:]:
+        my_transactions.extend(b.transactions)
+
+    my_transactions.extend(node.current_block)
+
+    transactions_to_add = [t for t in my_transactions if t.transaction_id not in transactions]
+
+    valid_transactions, ring_utxos = node.validate_transactions(transactions_to_add, new_utxos[-1])
+    print(ring_utxos)
+    node.current_block = valid_transactions
+    node.set_all_utxos(ring_utxos)
+    
+    node.chain.chain = new_chain
+    node.chain.UTXO_history = new_utxos
+
+    print('consesnus reached based on info by node X')
+
+
+def do_consensus(node, chains):
+    # total max common hash subchain
+    index = node.chain.get_max_prefex_chain(chains[0], 0)
+    chains = list(map(lambda c: c[index:], chains))
+    # #####
+
+    print('branch detected at index: ', index)
+
+    for chain in chains:
+        utxo_history, branch_index, transactions = node.validate_chain(chain, index)
+        if utxo_history != None:
+            consesus_succedeed(node, branch_index, utxo_history, chain, transactions)
+            return True
+
+    print('Could not achieve consensus')
+    return False
+
+    
 rx.combine_latest(
     nodeS,
     consensusS
@@ -161,10 +205,13 @@ rx.combine_latest(
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nl: {'node': nl[0]}),
+
+    # TODO:
+    # hashes = list(map(lambda chain: list(map(lambda block: block.current_hash,chain)),chains))
+
     ops.map(lambda o: {'node': o['node'], 'chains': broadcast(o['node'].get_other_hosts(), 'request-chain', {})}),
     ops.do_action(lambda o: o['chains'].sort(reverse = True,key = lambda x: len(x))),
-    ops.map(lambda o: {'utxos':o['node'].validate_chain(o['chains'][0][1:],1)}),
-    ops.do_action(lambda o: print(o['utxos'])),
+    ops.do_action(lambda o: do_consensus(o['node'], o['chains'])),
 ).subscribe()
 
 #

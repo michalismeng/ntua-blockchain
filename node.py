@@ -78,7 +78,7 @@ class node:
 
     # def broadcast_transaction():
 
-    def validate_transaction(self, t, UTXOS, verbose = False):
+    def validate_transaction(self, t, UTXOS, verbose=False):
         current_balance = 0
         if(t.receiver_address == t.sender_address):
             if verbose:
@@ -139,7 +139,7 @@ class node:
 
     def clear_current_block(self):
         # we clear our local current block (validated transaction pool)
-        # based on the new blockchain, we keep only valid transactions in our current block and update our utxos accordingly 
+        # based on the new blockchain, we keep only valid transactions in our current block and update our utxos accordingly
 
         valid_transactions, new_utxos = self.validate_transactions(self.current_block, self.chain.get_recent_UTXOS())
         self.current_block = valid_transactions
@@ -168,20 +168,22 @@ class node:
     def mine_block(self, b):
         return 0
 
+
     def validate_chain(self, blocks, index):
-        # chains.sort(reverse = True,key = lambda x: len(x))
-        # hashes = list(map(lambda chain: list(map(lambda block: block.current_hash,chain)),chains))
-        max_common_index = self.chain.get_max_prefex_chain(blocks,index)
+        max_common_index = self.chain.get_max_prefex_chain(blocks, index)
 
         temp_UTXOS = [self.chain.UTXO_history[index+max_common_index-1]]
+        transactions = set()
 
         for block in blocks[max_common_index:]:
-            new_UTXOS = self.validate_block(block,temp_UTXOS[-1])
+            new_UTXOS = self.validate_block(block, temp_UTXOS[-1])
             if new_UTXOS == None:
                 return None
+                
+            transactions.update([t.transaction_id for t in block.transactions])
             temp_UTXOS.append(new_UTXOS)
-        
-        return temp_UTXOS[1:]
+
+        return temp_UTXOS[1:], index + max_common_index, transactions
 
     # def broadcast_block():
 

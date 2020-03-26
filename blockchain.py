@@ -43,10 +43,8 @@ class BlockChain:
         return [block.current_hash for block in self.chain]
 
     def get_max_prefex_chain(self, blocks, index):
-        a = [my_block.current_hash != other_block.current_hash for my_block, other_block in zip(self.chain[index:], blocks)]
-        return a.index(max(a))
-
-
-
-
+        for i, (my_block, other_block) in enumerate(zip(self.chain[index:], blocks)):
+            if my_block.current_hash != other_block.current_hash:
+                return i
         
+        return len(self.chain[index:])

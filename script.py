@@ -55,6 +55,7 @@ def request_chain():
     n = current_node()
     response = make_response(jp.encode(n.chain.chain), 200)
     response.mimetype = "text/plain"
+    print('Chain sent')
     return response
 
 # bootstrap node
@@ -103,7 +104,7 @@ else:
     ip = sys.argv[1]
     port = int(sys.argv[2])
 
-    # time.sleep(0.2)
+    time.sleep(0.2)
 
     def current_node(): 
         global miner_node

@@ -19,11 +19,10 @@ def do_bootstrap_transactions(bootstrap_node):
     for _, _, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
         mytsxS.on_next((public_key, 100))
 
-def do_transaction(sender_node, target_key, amount):
+def create_transaction(sender_node, target_key, amount):
     UTXO_ids, UTXO_sum = sender_node.get_suffisient_UTXOS(amount)
     t = transaction.Transaction(sender_node.wallet.address, target_key, amount, UTXO_sum, UTXO_ids)
     t.sign_transaction(sender_node.wallet.private_key)
-    broadcast(sender_node.get_other_hosts(), 'add-transaction', { 'transaction': t })
     return t
 
 def do_genesis_block(bootstrap_node):
@@ -31,7 +30,7 @@ def do_genesis_block(bootstrap_node):
     broadcast(bootstrap_node.get_hosts(), 'add-block', { 'block': gen_block })
 
 def do_block(sender_node, block):
-    broadcast(sender_node.get_hosts(), 'add-block', { 'block': block })
+    broadcast(sender_node.get_other_hosts(), 'add-block', { 'block': block })
 
 def do_broadcast_ring(bootstrap_node):
     print('broadcating ring to all nodes...')

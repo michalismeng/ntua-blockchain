@@ -1,5 +1,5 @@
-from subscription_utils import do_transaction, do_block
-from blockchain_subjects import mytsxS
+from subscription_utils import do_block, create_transaction
+from blockchain_subjects import mytsxS, blcS
 import block
 import os
 from communication import unicast
@@ -22,9 +22,17 @@ def execute(n, s):
         print(n.chain.UTXO_history)
     elif s == 'block':
         print(n.get_pending_transactions())
-    elif str.startswith(s, 't'):
+
+    elif s.startswith('tu'):
+        _, id, amount = s.split(' ')
+        t = create_transaction(n, n.ring[int(id)][2], int(amount))
+        host = (n.ring[int(id)][0], n.ring[int(id)][1])
+        unicast(host, 'add-transaction', { 'transaction': t})
+
+    elif s.startswith('t'):
         _, id, amount = s.split(' ')
         mytsxS.on_next((n.ring[int(id)][2], int(amount)))
+
     elif s.startswith('b'):
         index = n.chain.get_last_block().index+1
         hs = n.chain.get_last_block().current_hash
@@ -40,4 +48,7 @@ def execute(n, s):
         _, index, hs = values
         b = block.Block(index, hs, 0)
         b.transactions = n.current_block
+
+        # TODO: Create myblcs subject
+        blcS.on_next(b)
         do_block(n, b)
