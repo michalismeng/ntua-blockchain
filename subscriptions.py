@@ -6,7 +6,7 @@ from subscription_utils import do_broadcast_ring, check_correct_running_thread, 
 from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS
 from cli import execute
 import settings
-from communication import broadcast
+from communication import broadcast,lazy_broadcast,unicast
 
 # we define one common thread pool with one available thread to be used by all pipelines
 # this way they all run on the same thread => they are serialized and no concurrency control is required
@@ -169,7 +169,7 @@ def consesus_succedeed(node, branch_index, utxo_history, chain, transactions):
     transactions_to_add = [t for t in my_transactions if t.transaction_id not in transactions]
 
     valid_transactions, ring_utxos = node.validate_transactions(transactions_to_add, new_utxos[-1])
-    print(ring_utxos)
+
     node.current_block = valid_transactions
     node.set_all_utxos(ring_utxos)
     
@@ -180,23 +180,22 @@ def consesus_succedeed(node, branch_index, utxo_history, chain, transactions):
 
 
 def do_consensus(node, chains):
-    # total max common hash subchain
-    index = node.chain.get_max_prefex_chain(chains[0], 0)
-    chains = list(map(lambda c: c[index:], chains))
-    # #####
 
+    index = node.chain.common_index
     print('branch detected at index: ', index)
 
-    for chain in chains:
-        utxo_history, branch_index, transactions = node.validate_chain(chain, index)
+    for i,chain in chains:
+        host = (node.ring[i][0],node.ring[i][1])
+        new_index = node.chain.get_max_prefex_chain(chain)
+        real_chain = unicast(host, 'request-chain', {'index': new_index})
+        utxo_history, branch_index, transactions = node.validate_chain(real_chain, new_index)
         if utxo_history != None:
-            consesus_succedeed(node, branch_index, utxo_history, chain, transactions)
+            consesus_succedeed(node, branch_index, utxo_history, real_chain, transactions)
             return True
 
     print('Could not achieve consensus')
     return False
 
-    
 rx.combine_latest(
     nodeS,
     consensusS
@@ -209,8 +208,9 @@ rx.combine_latest(
     # TODO:
     # hashes = list(map(lambda chain: list(map(lambda block: block.current_hash,chain)),chains))
 
-    ops.map(lambda o: {'node': o['node'], 'chains': broadcast(o['node'].get_other_hosts(), 'request-chain', {})}),
-    ops.do_action(lambda o: o['chains'].sort(reverse = True,key = lambda x: len(x))),
+    ops.map(lambda o: {'node': o['node'], 'chains': broadcast(o['node'].get_other_hosts(), 'request-chain-hash', {'index':o['node'].chain.common_index})}),
+    ops.do_action(lambda o: o['node'].chain.set_max_common_index(o['chains'])),
+    ops.map(lambda o: {'node': o['node'], 'chains': sorted(list(zip([i for i in range(settings.N) if i != o['node'].id],o['chains'])),reverse = True,key = lambda x: len(x[1]))}),
     ops.do_action(lambda o: do_consensus(o['node'], o['chains'])),
 ).subscribe()
 

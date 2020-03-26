@@ -18,65 +18,65 @@ zS = Subject()
 
 theVar = 0
 
-def doTheVar(x):
-    global theVar
-    theVar = x
-    print('new vlaue for the var: ', theVar)
+# def doTheVar(x):
+#     global theVar
+#     theVar = x
+#     print('new vlaue for the var: ', theVar)
 
 def _raise():
     raise Exception('Exception')
 
 p = ThreadPoolScheduler(1)
 
-xS.pipe(
-    ops.observe_on(p),
-    ops.do_action(lambda x: print('Commencing X pipe')),
-    ops.do_action(lambda x: time.sleep(1)),
-    ops.do_action(lambda v: _raise()),
-    ops.retry(1),
-    ops.do_action(lambda x: print('one second passed')),
-    ops.do_action(lambda x: time.sleep(1)),
-    ops.do_action(lambda v: doTheVar(v)),
-    ops.do_action(lambda v: print('Executing thread: ', threading.currentThread().name))
-).subscribe()
+# xS.pipe(
+#     ops.observe_on(p),
+#     ops.do_action(lambda x: print('Commencing X pipe')),
+#     ops.do_action(lambda x: time.sleep(1)),
+#     ops.do_action(lambda v: _raise()),
+#     ops.retry(1),
+#     ops.do_action(lambda x: print('one second passed')),
+#     ops.do_action(lambda x: time.sleep(1)),
+#     ops.do_action(lambda v: doTheVar(v)),
+#     ops.do_action(lambda v: print('Executing thread: ', threading.currentThread().name))
+# ).subscribe()
 
-yS.pipe(
-    ops.observe_on(p),
-    ops.do_action(lambda x: print('Commencing Y pipe')),
-    ops.do_action(lambda v: doTheVar(v))
-).subscribe(lambda x: print('Executing thread: ', threading.currentThread().name))
+# yS.pipe(
+#     ops.observe_on(p),
+#     ops.do_action(lambda x: print('Commencing Y pipe')),
+#     ops.do_action(lambda v: doTheVar(v))
+# ).subscribe(lambda x: print('Executing thread: ', threading.currentThread().name))
 
 
 
-def do_next():
-    print('Executing next thread: ', threading.currentThread().name)
-    xS.on_next(10)
-    xS.on_next(15)
-    yS.on_next(20)
+# def do_next():
+#     print('Executing next thread: ', threading.currentThread().name)
+#     xS.on_next(10)
+#     xS.on_next(15)
+#     yS.on_next(20)
 
 
 # threading.Thread(target=do_next).start()
 
 def cond(x):
-    return theVar != 5
+    inc_var()
+    print(theVar)
+    return theVar <= 5
 
 def inc_var():
     global theVar
-    print(theVar)
     theVar += 1
 
 zS.pipe(
-    ops.observe_on(p),
-    ops.do_action(lambda x: print(x)),
-    ops.do_while(lambda x: x <= 1),
-).subscribe(lambda x: print('ended'))
+    # ops.observe_on(p),
+    ops.do_while(cond),
+    # ops.do_action(lambda x: print('hello')),
+).subscribe()
 
 print('I am over here')
 zS.on_next(0)
-zS.on_next(1)
+zS.on_completed()
 
-time.sleep(5)
+# sorceS.on_next(0)
 
-print(theVar)
 
 exit(0)

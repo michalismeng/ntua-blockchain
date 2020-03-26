@@ -50,10 +50,18 @@ def add_block():
     blcS.on_next(args['block'])
     return jsonify('OK')
 
+@app.route('/request-chain-hash',methods=['POST'])
+def request_chain_hash():
+    args = jp.decode(request.data)
+    n = current_node()
+    print('Hash chain sent')
+    return jsonify(n.chain.chain_to_hashes()[args['index']:])
+
 @app.route('/request-chain',methods=['POST'])
 def request_chain():
+    args = jp.decode(request.data)
     n = current_node()
-    response = make_response(jp.encode(n.chain.chain), 200)
+    response = make_response(jp.encode(n.chain.chain[args['index']:]), 200)
     response.mimetype = "text/plain"
     print('Chain sent')
     return response

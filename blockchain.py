@@ -10,6 +10,7 @@ class BlockChain:
     def __init__(self):
         self.chain = []
         self.UTXO_history = []
+        self.common_index = 0
     
     def get_recent_UTXOS(self):
         return self.UTXO_history[-1]
@@ -42,9 +43,19 @@ class BlockChain:
     def chain_to_hashes(self):
         return [block.current_hash for block in self.chain]
 
-    def get_max_prefex_chain(self, blocks, index):
+    def get_max_prefex_block_chain(self, blocks, index):
         for i, (my_block, other_block) in enumerate(zip(self.chain[index:], blocks)):
             if my_block.current_hash != other_block.current_hash:
                 return i
         
         return len(self.chain[index:])
+
+    def get_max_prefex_chain(self, hashes):
+        for i, (my_hash, other_hash) in enumerate(zip(self.chain_to_hashes()[self.common_index:], hashes)):
+            if my_hash != other_hash:
+                return i
+        
+        return len(self.chain[self.common_index:])
+
+    def set_max_common_index(self,hash_chains):
+        self.common_index = min([self.get_max_prefex_chain(hash_chain) for hash_chain in hash_chains])

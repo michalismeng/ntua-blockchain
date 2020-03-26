@@ -170,7 +170,7 @@ class node:
 
 
     def validate_chain(self, blocks, index):
-        max_common_index = self.chain.get_max_prefex_chain(blocks, index)
+        max_common_index = self.chain.get_max_prefex_block_chain(blocks, index)
 
         temp_UTXOS = [self.chain.UTXO_history[index+max_common_index-1]]
         transactions = set()
