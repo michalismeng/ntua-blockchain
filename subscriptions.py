@@ -227,9 +227,3 @@ rx.combine_latest(
     ops.do_action(lambda x: execute(x[0], x[1]))
 ).subscribe()
 
-
-def mine(transactions):
-    # Create block with transactions and nonce = 0
-    # while hash does not contain 'difficulty' zeroes
-    # nonce = nonce + 1
-    # rehash

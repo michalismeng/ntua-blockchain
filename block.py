@@ -8,7 +8,6 @@ from blockchain_subjects import consensusS
 
 
 class Block:
-	#TODO: remove nonce from constructor
 	def __init__(self, index, previous_hash, nonce = None):
 		self.index = int(index)
 		self.timestamp = time.time()
@@ -16,6 +15,14 @@ class Block:
 		self.nonce = nonce
 		self.previous_hash = previous_hash
 		self.current_hash = str(self.__myHash__().hexdigest())
+
+	def seal_block(self,nonce):
+		self.timestamp = time.time()
+		self.nonce = nonce
+		self.current_hash = str(self.__myHash__().hexdigest())
+
+	def is_block_gold(self):
+		return self.current_hash.startswith('0'*settings.difficulty)
 
 	@staticmethod
 	def genesis(bootstrap_address):

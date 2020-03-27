@@ -3,7 +3,7 @@
 import rx
 from rx import operators as ops
 from rx.subject import Subject, ReplaySubject, BehaviorSubject
-from rx.scheduler import ThreadPoolScheduler, ImmediateScheduler, CurrentThreadScheduler, EventLoopScheduler, TrampolineScheduler
+from rx.scheduler import ThreadPoolScheduler, ImmediateScheduler, CurrentThreadScheduler, EventLoopScheduler, TrampolineScheduler, VirtualTimeScheduler
 import jsonpickle as jp
 import threading
 import time
@@ -26,7 +26,7 @@ theVar = 0
 def _raise():
     raise Exception('Exception')
 
-p = ThreadPoolScheduler(2)
+p = ThreadPoolScheduler(1)
 
 # xS.pipe(
 #     ops.observe_on(p),
@@ -66,39 +66,40 @@ def inc_var():
     global theVar
     theVar += 1
 
-dummyS = Subject()
 
 def op():
     return rx.pipe(
     # ops.observe_on(p),
-    ops.do_action(lambda x: time.sleep(2)),
+    ops.do_action(lambda x: time.sleep(5)),
     ops.do_action(lambda v: print('Executing thread: dummyS', threading.currentThread().name))
 )
-z_temp = zS.pipe(
+
+
+def do_next():
+    print('Executing')
+    time.sleep(5)
+    print('Ending')
+
+import multiprocessing 
+
+t = multiprocessing.Process(target=do_next) 
+zS.pipe(
     ops.observe_on(p),
     ops.do_action(lambda v: print('Executing thread: zS', threading.currentThread().name)),
-    # ops.do_while(cond),
-    # ops.do_action(lambda x: print('hello')),
-    op(),
+    ops.do_action(lambda v: t.terminate()),
     ops.do_action(lambda v: print('Executing thread: zS', threading.currentThread().name)),
 ).subscribe()
 
+z_temp = Subject()
 
-dummy_temp = dummyS.pipe(
-    ops.observe_on(p),
-    op()
-)
-
-# z_temp.pipe(
-#     op()
-# ).subscribe()
 
 # .subscribe()
 
 print('I am over here')
+t.start()
+
 zS.on_next(0)
-
+z_temp.on_next(0)
 # sorceS.on_next(0)
-
-
+t.join()
 exit(0)

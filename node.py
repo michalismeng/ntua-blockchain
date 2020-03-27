@@ -5,7 +5,7 @@ import settings
 import threading
 from collections import deque
 from copy import deepcopy
-
+from random import randint
 
 class node:
     def __init__(self, id, ip, port, wallet):
@@ -164,9 +164,21 @@ class node:
         # return None
         # TODO:mine
         # if enough transactions  mine
+    def mine(self,block):
+        nonce = (randint(0, 4294967295) * self.id) % 4294967295
+        block.seal_block(nonce)
 
-    def mine_block(self, b):
-        return 0
+        while not(block.is_block_gold()):
+            nonce = (nonce+1) % 4294967295
+            block.seal_block(nonce)
+
+    def look_for_ore_block(self):
+        index = self.chain.get_last_block().index+1
+        hs = self.chain.get_last_block().current_hash
+        b = block.Block(index, hs, 0)
+        b.transactions = self.current_block[:settings.capacity]
+        self.mine(b)
+        return b
 
     def verify_chain(self, blocks, index):
         print('verification at block index')

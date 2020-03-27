@@ -2,6 +2,6 @@
 bootstrap_ip='127.0.0.1'
 bootstrap_port=25000
 baseurl_bootstrap = 'http://{}:{}/'.format(bootstrap_ip, bootstrap_port)
-N = 3
-capacity = 20
-difficulty = 4
+N = 2
+capacity = 3
+difficulty = 3

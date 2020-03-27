@@ -25,6 +25,9 @@ def execute(n, s):
 
     elif s == 'ci':
         print(n.chain.common_index)
+    
+    elif s == 'mine':
+        print(n.look_for_ore_block().current_hash)
 
     elif s.startswith('tu'):
         _, id, amount = s.split(' ')
