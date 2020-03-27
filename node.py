@@ -168,6 +168,17 @@ class node:
     def mine_block(self, b):
         return 0
 
+    def verify_chain(self, blocks, index):
+        print('verification at block index')
+        print(blocks[0].index)
+        
+        temp_blocks = [self.chain.chain[index - 1]] + blocks
+
+        for i in range(len(temp_blocks) - 1):
+            if not(temp_blocks[i + 1].verify_block(temp_blocks[i], True)):
+                return False
+
+        return True
 
     def validate_chain(self, blocks, index):
         max_common_index = self.chain.get_max_prefex_block_chain(blocks, index)

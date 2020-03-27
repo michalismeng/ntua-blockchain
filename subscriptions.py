@@ -99,7 +99,7 @@ rx.combine_latest(
 
     # check that this is not a genesis block
     ops.filter(lambda o: o['bl'].previous_hash != 1),
-    ops.filter(lambda o: o['node'].chain.verify_block(o['bl'])),
+    ops.filter(lambda o: o['bl'].verify_block(o['node'].chain.get_last_block())),
     ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'utxos': o['node'].validate_block(o['bl'],o['node'].chain.get_recent_UTXOS())}),
     ops.filter(lambda o: o['utxos'] != None),
     ops.do_action(lambda o: o['node'].chain.add_block(o['bl'],o['utxos'])),
@@ -180,18 +180,23 @@ def consesus_succedeed(node, branch_index, utxo_history, chain, transactions):
 
 def do_consensus(node, chains):
 
-    index = node.chain.common_index
-    print('branch detected at index: ', index)
-
     for i,chain in chains:
         host = (node.ring[i][0],node.ring[i][1])
-        new_index = node.chain.get_max_prefex_chain(chain)
+        new_index = node.chain.common_index + node.chain.get_max_prefex_chain(chain)
+        print('branch for node {} detected at index: {}'.format(i, new_index))
         real_chain = unicast(host, 'request-chain', {'index': new_index})
+
+        if not(node.verify_chain(real_chain, new_index)):
+            print('Consensus chain is not verified')
+            return False
+
         utxo_history, branch_index, transactions = node.validate_chain(real_chain, new_index)
         if utxo_history != None:
-            #TODO: set_common_index
             consesus_succedeed(node, branch_index, utxo_history, real_chain, transactions)
+            print([len(c) for _, c in chains])
+            node.chain.set_max_common_index([c for _, c in chains])
             print('consesnus reached based on info by node ' + str(i))
+            print('new max common index: ', node.chain.common_index)
             return True
 
     print('Could not achieve consensus')
@@ -205,9 +210,7 @@ rx.combine_latest(
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nl: {'node': nl[0]}),
-    #TODO: check update set_max_common_index
     ops.map(lambda o: {'node': o['node'], 'chains': broadcast(o['node'].get_other_hosts(), 'request-chain-hash', {'index':o['node'].chain.common_index})}),
-    ops.do_action(lambda o: o['node'].chain.set_max_common_index(o['chains'])),
     ops.map(lambda o: {'node': o['node'], 'chains': sorted(list(zip([i for i in range(settings.N) if i != o['node'].id],o['chains'])),reverse = True,key = lambda x: len(x[1]))}),
     ops.do_action(lambda o: do_consensus(o['node'], o['chains'])),
 ).subscribe()
@@ -223,3 +226,10 @@ rx.combine_latest(
     ops.observe_on(cli_thread_pool),
     ops.do_action(lambda x: execute(x[0], x[1]))
 ).subscribe()
+
+
+def mine(transactions):
+    # Create block with transactions and nonce = 0
+    # while hash does not contain 'difficulty' zeroes
+    # nonce = nonce + 1
+    # rehash

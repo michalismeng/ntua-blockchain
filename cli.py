@@ -23,6 +23,9 @@ def execute(n, s):
     elif s == 'block':
         print(n.get_pending_transactions())
 
+    elif s == 'ci':
+        print(n.chain.common_index)
+
     elif s.startswith('tu'):
         _, id, amount = s.split(' ')
         t = create_transaction(n, n.ring[int(id)][2], int(amount))
@@ -47,7 +50,8 @@ def execute(n, s):
             values.append(n.chain.get_last_block().current_hash)
         _, index, hs = values
         b = block.Block(index, hs, 0)
-        b.transactions = n.current_block
+        for t in  n.current_block:
+            b.add_transaction(t)
 
         # TODO: Create myblcs subject
         blcS.on_next(b)

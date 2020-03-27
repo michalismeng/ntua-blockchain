@@ -4,3 +4,4 @@ bootstrap_port=25000
 baseurl_bootstrap = 'http://{}:{}/'.format(bootstrap_ip, bootstrap_port)
 N = 3
 capacity = 20
+difficulty = 4
