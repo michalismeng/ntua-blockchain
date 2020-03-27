@@ -3,19 +3,56 @@ from rx import operators as ops
 import rx.scheduler
 
 from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions, create_transaction
-from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS
+from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS, minerS
 from cli import execute
 import settings
 from communication import broadcast,lazy_broadcast,unicast
+from threading import Thread
 
 # we define one common thread pool with one available thread to be used by all pipelines
 # this way they all run on the same thread => they are serialized and no concurrency control is required
 blockchain_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
 cli_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
+miner_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
 
 #
 #   MAIN PROGRAM PIPELINES
 #
+
+'''
+Damn ye! Let Neptune strike ye dead Winslow! HAAARK!
+Hark Triton, hark! Bellow, bid our father the Sea King rise from the depths full foul in his fury!
+Black waves teeming with salt foam to smother this young mouth with pungent slime, to choke ye, 
+engorging your organs til' ye turn blue and bloated with bilge and brine and can scream no more - only when he,
+crowned in cockle shells with slitherin' tentacle tail and steaming beard take up his fell be-finned arm,
+his coral-tine trident screeches banshee-like in the tempest and plunges right through yer gullet,
+bursting ye - a bulging bladder no more, but a blasted bloody film now and nothing for the harpies 
+and the souls of dead sailors to peck and claw and feed upon only to be lapped up 
+and swallowed by the infinite waters of the Dread Emperor himself - forgotten to any man, to any time,
+forgotten to any god or devil, forgotten even to the sea, for any stuff for part of Winslow,
+even any scantling of your soul is Winslow no more, but is now itself the sea!
+'''
+
+minerS
+rx.combine_latest(
+    nodeS,
+    minerS
+).pipe(
+    ops.observe_on(miner_thread_pool),
+    ops.do_action(lambda o: print('Entering miner')),
+    ops.map(lambda nc: {'node': nc[0]}),
+    ops.map(lambda o: {'node':o['node'], 'block':o['node'].look_for_ore_block()}),
+    ops.do_action(lambda o: print('Har Har Har found the ore')),
+    ops.do_action(lambda o: o['node'].hier_miner()),
+    ops.map(lambda o: {'node':o['node'], 'block': o['block'], 'miner':Thread(target = o['node'].miner.mine, args=(o['block'],o['node'].id))}),
+    ops.do_action(lambda o: o['miner'].start()),
+    ops.do_action(lambda o: o['miner'].join()),
+    ops.do_action(lambda o: print('I see something in me rock')),
+    ops.filter(lambda o: o['block'].is_block_gold()),
+    ops.do_action(lambda o: print('It is GOLD I tell ya')),
+    ops.do_action(lambda o: broadcast(o['node'].get_hosts(),'add-block', { 'block': o['block'] })),
+    ops.do_action(lambda o: print('Ya\'ll got me gold!')),
+).subscribe()
 
 # node pipeline - the first to be executed
 nodeS.pipe(

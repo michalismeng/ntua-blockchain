@@ -6,6 +6,8 @@ import threading
 from collections import deque
 from copy import deepcopy
 from random import randint
+from miner import Miner
+from blockchain_subjects import minerS
 
 class node:
     def __init__(self, id, ip, port, wallet):
@@ -17,9 +19,13 @@ class node:
         self.chain = BlockChain()
         self.lock = threading.Lock()
         self.current_block = []		# TODO: Imporve this
+        self.miner = Miner()
         # here we store information for every node, as its id, its (ip:port) its public key and its UTXOS (sender address: receiver id, amount)
         self.ring = []
         self.current_node_count = len(self.ring)
+
+    def hier_miner(self):
+        self.miner = Miner()
 
     def get_suffisient_UTXOS(self, ammount):
         UTXOS = self.get_node_UTXOS(self.id)
@@ -147,37 +153,14 @@ class node:
 
     def add_transaction_to_block(self, t):
         self.current_block.append(t)
-        # self.lock.acquire()
-        # if len(self.current_block) >= settings.capacity:
-        #     temp_block = deepcopy(self.current_block[:settings.capacity])
-        #     last_block = self.chain.get_last_block()
-        #     new_block = block.Block(
-        #         last_block.index+1, last_block.current_hash)
-        #     while not new_block.is_full():
-        #         new_block.add_transaction(temp_block.pop())
-        #     # work to do here
-        #     new_block.set_nonce(self.mine_block(new_block))
-        #     #
-        #     self.lock.release()
-        #     return new_block
-        # self.lock.release()
-        # return None
-        # TODO:mine
-        # if enough transactions  mine
-    def mine(self,block):
-        nonce = (randint(0, 4294967295) * self.id) % 4294967295
-        block.seal_block(nonce)
-
-        while not(block.is_block_gold()):
-            nonce = (nonce+1) % 4294967295
-            block.seal_block(nonce)
+        if len(self.current_block) >= settings.capacity:
+            minerS.on_next(0)
 
     def look_for_ore_block(self):
         index = self.chain.get_last_block().index+1
         hs = self.chain.get_last_block().current_hash
         b = block.Block(index, hs, 0)
         b.transactions = self.current_block[:settings.capacity]
-        self.mine(b)
         return b
 
     def verify_chain(self, blocks, index):

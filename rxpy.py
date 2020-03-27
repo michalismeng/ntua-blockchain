@@ -77,6 +77,8 @@ def op():
 
 def do_next():
     print('Executing')
+    inc_var()
+    print(theVar)
     time.sleep(5)
     print('Ending')
 
@@ -86,20 +88,24 @@ t = multiprocessing.Process(target=do_next)
 zS.pipe(
     ops.observe_on(p),
     ops.do_action(lambda v: print('Executing thread: zS', threading.currentThread().name)),
-    ops.do_action(lambda v: t.terminate()),
+    # ops.do_action(lambda v: t.terminate()),
     ops.do_action(lambda v: print('Executing thread: zS', threading.currentThread().name)),
 ).subscribe()
 
 z_temp = Subject()
 
+z_temp.pipe(
+    ops.do_action(lambda v: t.terminate()),
+).subscribe()
 
 # .subscribe()
 
 print('I am over here')
 t.start()
-
 zS.on_next(0)
-z_temp.on_next(0)
-# sorceS.on_next(0)
+# z_temp.on_next(0)
+
 t.join()
+print(theVar)
+# sorceS.on_next(0)
 exit(0)

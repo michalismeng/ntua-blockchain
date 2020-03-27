@@ -24,5 +24,8 @@ genesisS = Subject()
 # my transaction subject
 mytsxS = Subject()
 
-# consensus subjects
+# consensus subject
 consensusS = Subject()
+
+# miner subject
+minerS = Subject()

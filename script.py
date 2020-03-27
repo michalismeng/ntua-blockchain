@@ -47,6 +47,8 @@ def add_transaction():
 @app.route('/add-block', methods=['POST'])
 def add_block():
     args = jp.decode(request.data)
+    n = current_node()
+    n.miner.terminate()
     blcS.on_next(args['block'])
     return jsonify('OK')
 
