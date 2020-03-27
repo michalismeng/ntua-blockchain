@@ -176,7 +176,6 @@ def consesus_succedeed(node, branch_index, utxo_history, chain, transactions):
     node.chain.chain = new_chain
     node.chain.UTXO_history = new_utxos
 
-    print('consesnus reached based on info by node X')
 
 
 def do_consensus(node, chains):
@@ -190,7 +189,9 @@ def do_consensus(node, chains):
         real_chain = unicast(host, 'request-chain', {'index': new_index})
         utxo_history, branch_index, transactions = node.validate_chain(real_chain, new_index)
         if utxo_history != None:
+            #TODO: set_common_index
             consesus_succedeed(node, branch_index, utxo_history, real_chain, transactions)
+            print('consesnus reached based on info by node ' + str(i))
             return True
 
     print('Could not achieve consensus')
@@ -204,10 +205,7 @@ rx.combine_latest(
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nl: {'node': nl[0]}),
-
-    # TODO:
-    # hashes = list(map(lambda chain: list(map(lambda block: block.current_hash,chain)),chains))
-
+    #TODO: check update set_max_common_index
     ops.map(lambda o: {'node': o['node'], 'chains': broadcast(o['node'].get_other_hosts(), 'request-chain-hash', {'index':o['node'].chain.common_index})}),
     ops.do_action(lambda o: o['node'].chain.set_max_common_index(o['chains'])),
     ops.map(lambda o: {'node': o['node'], 'chains': sorted(list(zip([i for i in range(settings.N) if i != o['node'].id],o['chains'])),reverse = True,key = lambda x: len(x[1]))}),

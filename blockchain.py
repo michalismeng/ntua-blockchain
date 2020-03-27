@@ -28,6 +28,7 @@ class BlockChain:
     def get_block_indexes(self):
         return [block.index for block in self.chain]
     
+    #TODO:chech hashes
     def verify_block(self,b):
         if b.previous_hash == self.chain[-1].current_hash and b.index == self.chain[-1].index+1:
             return True
@@ -58,4 +59,4 @@ class BlockChain:
         return len(self.chain[self.common_index:])
 
     def set_max_common_index(self,hash_chains):
-        self.common_index = min([self.get_max_prefex_chain(hash_chain) for hash_chain in hash_chains])
+        self.common_index += min([self.get_max_prefex_chain(hash_chain) for hash_chain in hash_chains])
