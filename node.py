@@ -164,8 +164,7 @@ class node:
         return b
 
     def verify_chain(self, blocks, index):
-        print('verification at block index')
-        print(blocks[0].index)
+        print('verification at block index: {}'.format(blocks[0].index))
         
         temp_blocks = [self.chain.chain[index - 1]] + blocks
 

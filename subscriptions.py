@@ -230,7 +230,6 @@ def do_consensus(node, chains):
         utxo_history, branch_index, transactions = node.validate_chain(real_chain, new_index)
         if utxo_history != None:
             consesus_succedeed(node, branch_index, utxo_history, real_chain, transactions)
-            print([len(c) for _, c in chains])
             node.chain.set_max_common_index([c for _, c in chains])
             print('consesnus reached based on info by node ' + str(i))
             print('new max common index: ', node.chain.common_index)

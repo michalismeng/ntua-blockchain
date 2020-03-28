@@ -40,22 +40,19 @@ def execute(n, s):
         mytsxS.on_next((n.ring[int(id)][2], int(amount)))
 
     elif s.startswith('b'):
-        index = n.chain.get_last_block().index+1
-        hs = n.chain.get_last_block().current_hash
-        b = block.Block(index, hs, 0)
-        host = (n.ring[1][0], n.ring[1][1])
+        _, id = s.split(' ')
+        b = n.look_for_ore_block()
+        n.hier_miner()
+        n.miner.mine(b,n.id)
+        print('found valid block')
+        host = (n.ring[int(id)][0], n.ring[int(id)][1])
         unicast(host, 'add-block', { 'block': b })
-    elif s.startswith('s'):
-        values = s.split(' ')
-        if len(values) == 1:
-            values.append(n.chain.get_last_block().index+1)
-        if len(values) == 2:
-            values.append(n.chain.get_last_block().current_hash)
-        _, index, hs = values
-        b = block.Block(index, hs, 0)
-        for t in  n.current_block:
-            b.add_transaction(t)
 
+    elif s.startswith('s'):
+        b = n.look_for_ore_block()
+        n.hier_miner()
+        n.miner.mine(b,n.id)
+        print('found valid block')
         # TODO: Create myblcs subject
         blcS.on_next(b)
         do_block(n, b)

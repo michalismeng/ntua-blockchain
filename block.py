@@ -47,15 +47,9 @@ class Block:
 		if str(self.__myHash__().hexdigest()) != self.current_hash:
 			return False
 
-		#TODO: uncomment to check nonce
-		# if not(self.current_hash.startswith(settings.difficulty * '0')):
-		# 	return False
+		if not(self.current_hash.startswith(settings.difficulty * '0')):
+			return False
 
-		# print(self.previous_hash)
-		# print(last_block.current_hash)
-		# print(self.index)
-		# print(last_block.index + 1)
-		
 		if self.previous_hash == last_block.current_hash and self.index == last_block.index + 1:
 			return True
 
