@@ -8,6 +8,7 @@ from copy import deepcopy
 from random import randint
 from miner import Miner
 from blockchain_subjects import minerS
+import utils
 
 class node:
     def __init__(self, id, ip, port, wallet):
@@ -18,14 +19,11 @@ class node:
         self.port = port
         self.chain = BlockChain()
         self.lock = threading.Lock()
-        self.current_block = []		# TODO: Imporve this
+        self.current_block = []
         self.miner = Miner()
-        # here we store information for every node, as its id, its (ip:port) its public key and its UTXOS (sender address: receiver id, amount)
+        # here we store information for every node, its (ip:port) its public key and its UTXOS ({ sender address: receiver id, amount })
         self.ring = []
         self.current_node_count = len(self.ring)
-
-    def hier_miner(self):
-        self.miner = Miner()
 
     def get_suffisient_UTXOS(self, ammount):
         UTXOS = self.get_node_UTXOS(self.id)
@@ -59,6 +57,9 @@ class node:
     def get_pending_transactions(self):
         return [t.transaction_id for t in self.current_block]
 
+    def get_host_by_id(self, id):
+        return (self.ring[id][0], self.ring[id][1])
+
     def get_hosts(self):
         return [(ip, port) for ip, port, _, _ in self.ring]
 
@@ -76,13 +77,6 @@ class node:
         match = [id for id, (_, _, pkey, _) in enumerate(
             self.ring) if pkey == address]
         return match[0]
-
-    # def create_new_block():
-
-    # def create_transaction(sender, receiver, signature):
-    # 	#remember to broadcast it
-
-    # def broadcast_transaction():
 
     def validate_transaction(self, t, UTXOS, verbose=False):
         current_balance = 0
@@ -147,14 +141,13 @@ class node:
         # we clear our local current block (validated transaction pool)
         # based on the new blockchain, we keep only valid transactions in our current block and update our utxos accordingly
 
+        # TODO: Move these to block pipeline
         valid_transactions, new_utxos = self.validate_transactions(self.current_block, self.chain.get_recent_UTXOS())
         self.current_block = valid_transactions
         self.set_all_utxos(new_utxos)
 
     def add_transaction_to_block(self, t):
         self.current_block.append(t)
-        if len(self.current_block) >= settings.capacity:
-            minerS.on_next(0)
 
     def look_for_ore_block(self):
         index = self.chain.get_last_block().index+1
@@ -164,8 +157,7 @@ class node:
         return b
 
     def verify_chain(self, blocks, index):
-        print('verification at block index: {}'.format(blocks[0].index))
-        
+        # temp_blocks = zip([last_block] + blocks[:-1], blocks)
         temp_blocks = [self.chain.chain[index - 1]] + blocks
 
         for i in range(len(temp_blocks) - 1):
@@ -174,8 +166,10 @@ class node:
 
         return True
 
-    def validate_chain(self, blocks, index):
-        max_common_index = self.chain.get_max_prefex_block_chain(blocks, index)
+    def validate_chain(self, blocks, index): 
+        hash_blocks = [b.current_hash for b in blocks]
+        hash_my_blocks = [b.current_hash for b in self.chain.chain[index:]]
+        max_common_index = utils.get_max_common_prefix_length(hash_blocks, hash_my_blocks)
 
         temp_UTXOS = [self.chain.UTXO_history[index+max_common_index-1]]
         transactions = set()

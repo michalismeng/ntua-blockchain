@@ -24,7 +24,6 @@ def create_node(ip, port):
 
     return node.node(myid, ip, port, node_wallet)
 
-# create a bootstrap node
 def create_bootstrap_node():
     node_wallet = wallet.wallet()
 
@@ -36,3 +35,11 @@ def startThreadedServer(app, ip, port):
     x = threading.Thread(target=lambda ip, port: app.run(host=ip, port=port), args=(ip, port))
     x.start()
     return x
+
+def get_max_common_prefix_length(list1, list2):
+    # l = [item1 != item2 for item1, item2 in zip(list1, list2)] + [1]
+    # l.index(min(l))
+    for i, (item1, item2) in enumerate(zip(list1, list2)):
+        if(item1 != item2):
+            return i
+    return min(len(list1), len(list2))

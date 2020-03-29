@@ -98,14 +98,22 @@ z_temp.pipe(
     ops.do_action(lambda v: t.terminate()),
 ).subscribe()
 
+zS = Subject()
+zS.pipe(
+    ops.observe_on(ImmediateScheduler()),
+    ops.do_action(lambda x: print('Im sleepping')),
+    ops.do_action(lambda x: time.sleep(5))
+).subscribe(lambda x: print('done'))
+
+zS.on_next(10)
 # .subscribe()
 
 print('I am over here')
-t.start()
-zS.on_next(0)
+# t.start()
+# zS.on_next(0)
 # z_temp.on_next(0)
 
-t.join()
+# t.join()
 print(theVar)
 # sorceS.on_next(0)
 exit(0)

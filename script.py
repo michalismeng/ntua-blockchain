@@ -19,6 +19,8 @@ import time
 import threading
 import os
 
+import cli
+
 # uncomment to disable FLASK messages
 import logging
 log = logging.getLogger('werkzeug')
@@ -27,10 +29,41 @@ log.setLevel(logging.ERROR)
 from blockchain_subjects import nodeS, node_countS, blcS, tsxS, ringS, commandS
 import subscriptions        # import to execute them
 
+commands_script = []
+command_index = 0
+
 app = Flask(__name__)
 def create_global_variable(name, value):
     if name not in globals():
         globals()[name] = value
+
+@app.route('/execute-command', methods=['POST'])
+def execute_command():
+    global commands_script, command_index
+    command = jp.decode(request.data)['command']
+    if command.startswith('load'):
+        file = command.split()[1]
+        command_index = 0
+        with open('scripts/{}'.format(file), 'r') as f:
+            lines = f.readlines()
+            commands_script = [x.strip() for x in lines] 
+            print('loaded {} commands'.format(len(commands_script)))
+    elif command.startswith('exec'):
+        command = command.split()[1:]
+        args = command.split()
+        ids = args[0].split(',')
+        if 'id{}'.format(current_node().id) in ids:
+            cli.execute(current_node(), ' '.join(args[1:]))
+    elif command == 'next':
+        command = commands_script[command_index]
+        command_index += 1
+        args = command.split()
+        ids = args[0].split(',')
+        if 'id{}'.format(current_node().id) in ids:
+            cli.execute(current_node(), ' '.join(args[1:]))
+
+    return jsonify('OK')
+    
 
 @app.route('/get-ring', methods=['POST'])
 def update_ring():
@@ -47,19 +80,20 @@ def add_transaction():
 @app.route('/add-block', methods=['POST'])
 def add_block():
     args = jp.decode(request.data)
-    n = current_node()
-    n.miner.terminate()
     blcS.on_next(args['block'])
     return jsonify('OK')
 
-@app.route('/request-chain-hash',methods=['POST'])
+@app.route('/request-chain-hash', methods=['POST'])
 def request_chain_hash():
     args = jp.decode(request.data)
     n = current_node()
+    #TODO: use hashes only after index
+    hashes = n.chain.chain_to_hashes()
+    result = { 'hashes': hashes[args['index']:], 'id': n.id }
     print('Hash chain sent')
-    return jsonify(n.chain.chain_to_hashes()[args['index']:])
+    return jsonify(result)
 
-@app.route('/request-chain',methods=['POST'])
+@app.route('/request-chain', methods=['POST'])
 def request_chain():
     args = jp.decode(request.data)
     n = current_node()
@@ -68,8 +102,29 @@ def request_chain():
     print('Chain sent')
     return response
 
+@app.route('/enter-ring', methods=['POST'])
+def get_data():
+    create_global_variable('node_count', 1) # initialize to 1 since the bootstrap node is already registered
+    global node_count
+
+    if(node_count >= settings.N):
+        return jsonify("ERROR")
+
+    args = jp.decode(request.data)
+    ip, port, public_key = args['ip'], args['port'], args['public_key']
+    utils.register_node_to_ring(current_node(), node, ip, port, public_key)
+
+    response = { 'id': node_count }
+    node_countS.on_next(node_count)
+
+    node_count += 1
+
+    return jsonify(response)
+
 # bootstrap node
 if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
+
+    # settings.difficulty = 4
 
     def current_node(): 
         global bootstrap_node
@@ -80,25 +135,6 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
     utils.startThreadedServer(app, bootstrap_ip, bootstrap_port)
     bootstrap_node = utils.create_bootstrap_node()
     nodeS.on_next(bootstrap_node)
-
-    @app.route('/enter-ring', methods=['POST'])
-    def get_data():
-        create_global_variable('node_count', 1) # initialize to 1 since the bootstrap node is already registered
-        global node_count
-
-        if(node_count >= settings.N):
-            return jsonify("ERROR")
-
-        args = jp.decode(request.data)
-        ip, port, public_key = args['ip'], args['port'], args['public_key']
-        utils.register_node_to_ring(current_node(), node, ip, port, public_key)
-
-        response = { 'id': node_count }
-        node_countS.on_next(node_count)
-
-        node_count += 1
-
-        return jsonify(response)
 
     while True:
         x = input()

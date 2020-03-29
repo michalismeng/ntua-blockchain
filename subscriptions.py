@@ -3,11 +3,13 @@ from rx import operators as ops
 import rx.scheduler
 
 from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions, create_transaction
-from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS, minerS
+from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS, minerS, consensusSucceededS
 from cli import execute
 import settings
 from communication import broadcast,lazy_broadcast,unicast
 from threading import Thread
+import utils
+import threading
 
 # we define one common thread pool with one available thread to be used by all pipelines
 # this way they all run on the same thread => they are serialized and no concurrency control is required
@@ -33,20 +35,25 @@ forgotten to any god or devil, forgotten even to the sea, for any stuff for part
 even any scantling of your soul is Winslow no more, but is now itself the sea!
 '''
 
+def miner_operator():
+    return rx.pipe(
+        ops.filter(lambda o: len(o['node'].current_block) >= settings.capacity and not(o['node'].miner.running)),
+        ops.do_action(lambda o: minerS.on_next(0))
+    )
+
 minerS
 rx.combine_latest(
     nodeS,
     minerS
 ).pipe(
     ops.observe_on(miner_thread_pool),
+    # ops.do_action(lambda o: print(threading.currentThread().name)),
+
     ops.do_action(lambda o: print('Entering miner')),
     ops.map(lambda nc: {'node': nc[0]}),
     ops.map(lambda o: {'node':o['node'], 'block':o['node'].look_for_ore_block()}),
     ops.do_action(lambda o: print('Har Har Har found the ore')),
-    ops.do_action(lambda o: o['node'].hier_miner()),
-    ops.map(lambda o: {'node':o['node'], 'block': o['block'], 'miner':Thread(target = o['node'].miner.mine, args=(o['block'],o['node'].id))}),
-    ops.do_action(lambda o: o['miner'].start()),
-    ops.do_action(lambda o: o['miner'].join()),
+    ops.do_action(lambda o: o['node'].miner.mine(o['block'],o['node'].id)),
     ops.do_action(lambda o: print('I see something in me rock')),
     ops.filter(lambda o: o['block'].is_block_gold()),
     ops.do_action(lambda o: print('It is GOLD I tell ya')),
@@ -132,16 +139,27 @@ rx.combine_latest(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
 
+    # ops.do_action(lambda o: print('BLOCK')),
+    # ops.do_action(lambda o: print(threading.currentThread().name)),
+
     ops.map(lambda nl: {'node': nl[0], 'bl': nl[1]}),
 
     # check that this is not a genesis block
     ops.filter(lambda o: o['bl'].previous_hash != 1),
+
+    # TODO: Consensus on next may need to be blocking (Immediate Scheduler)
+    #? Miner sends block, terminate miner, need consensus, miner block arrives in pipeline (changes blockchain), consensus happens
+
     ops.filter(lambda o: o['bl'].verify_block(o['node'].chain.get_last_block())),
     ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'utxos': o['node'].validate_block(o['bl'],o['node'].chain.get_recent_UTXOS())}),
     ops.filter(lambda o: o['utxos'] != None),
+
+    ops.do_action(lambda o: o['node'].miner.terminate()),
+    
     ops.do_action(lambda o: o['node'].chain.add_block(o['bl'],o['utxos'])),
     ops.do_action(lambda o: o['node'].clear_current_block()),
-    ops.do_action(lambda o: print('Received block: ', o['bl'].stringify()))
+    ops.do_action(lambda o: print('Received block: ', o['bl'].stringify())),
+    miner_operator()
 ).subscribe()
 
 # pipeline for transactions
@@ -165,6 +183,8 @@ rx.combine_latest(
     ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
 
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
+
+    miner_operator()
 ).subscribe()
 
 # pipeline for my transactions
@@ -190,6 +210,8 @@ rx.combine_latest(
     ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
 
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
+
+    miner_operator()
 ).subscribe()
 
 def consesus_succedeed(node, branch_index, utxo_history, chain, transactions):
@@ -214,25 +236,35 @@ def consesus_succedeed(node, branch_index, utxo_history, chain, transactions):
     node.chain.UTXO_history = new_utxos
 
 
+def do_consensus(node, hashes):
 
-def do_consensus(node, chains):
+    # sort all chains based on their length while keeping the id of the node 
+    ids_hashes = sorted(hashes, reverse = True, key = lambda x: len(x['hashes']))
 
-    for i,chain in chains:
-        host = (node.ring[i][0],node.ring[i][1])
-        new_index = node.chain.common_index + node.chain.get_max_prefex_chain(chain)
-        print('branch for node {} detected at index: {}'.format(i, new_index))
-        real_chain = unicast(host, 'request-chain', {'index': new_index})
+    # starting with the node with the longest chain, request his blocks and try to reach consensus
+    for item in ids_hashes:
+        id = item['id']
+        hashes = item['hashes']
+        host = node.get_host_by_id(id)
 
-        if not(node.verify_chain(real_chain, new_index)):
+        # find the max common subchain with the node under consideration (this may differ from the previous global common chain we calculated)
+        new_index = node.chain.common_index + utils.get_max_common_prefix_length(hashes, node.chain.chain_to_hashes()[node.chain.common_index:])
+
+        print('branch for node {} detected at index: {}'.format(id, new_index))
+
+        # request the block chain, after the specified index
+        block_chain = unicast(host, 'request-chain', { 'index': new_index })
+
+        if not(node.verify_chain(block_chain, new_index)):
             print('Consensus chain is not verified')
             return False
 
-        utxo_history, branch_index, transactions = node.validate_chain(real_chain, new_index)
+        utxo_history, branch_index, transactions = node.validate_chain(block_chain, new_index)
         if utxo_history != None:
-            consesus_succedeed(node, branch_index, utxo_history, real_chain, transactions)
-            node.chain.set_max_common_index([c for _, c in chains])
-            print('consesnus reached based on info by node ' + str(i))
-            print('new max common index: ', node.chain.common_index)
+            # this is a blocking call
+            consensusSucceededS.on_next((branch_index, utxo_history, block_chain, transactions, ids_hashes))
+
+            print('consesnus reached based on info by node ' + str(id))
             return True
 
     print('Could not achieve consensus')
@@ -246,9 +278,28 @@ rx.combine_latest(
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nl: {'node': nl[0]}),
-    ops.map(lambda o: {'node': o['node'], 'chains': broadcast(o['node'].get_other_hosts(), 'request-chain-hash', {'index':o['node'].chain.common_index})}),
-    ops.map(lambda o: {'node': o['node'], 'chains': sorted(list(zip([i for i in range(settings.N) if i != o['node'].id],o['chains'])),reverse = True,key = lambda x: len(x[1]))}),
-    ops.do_action(lambda o: do_consensus(o['node'], o['chains'])),
+
+    ops.do_action(lambda o: o['node'].miner.terminate()),
+
+    # # request blockchain hashes from all nodes, after a certrain point in the blockchain (common_index) at which all nodes agree
+    ops.map(lambda o: {'node': o['node'], 'results': broadcast(o['node'].get_other_hosts(), 'request-chain-hash', {'index': o['node'].chain.common_index })}),
+    ops.do_action(lambda o: do_consensus(o['node'], o['results'])),
+
+    miner_operator()
+).subscribe()
+
+rx.combine_latest(
+    nodeS,
+    consensusSucceededS
+).pipe(
+    ops.observe_on(rx.scheduler.ImmediateScheduler()),
+    ops.do_action(lambda _: check_correct_running_thread()),
+
+    ops.map(lambda nc: {'node': nc[0], 'branch_index': nc[1][0], 'utxo_history': nc[1][1], 'block_chain': nc[1][2], 'transactions': nc[1][3], 'ids_hashes': nc[1][4] }),
+    ops.do_action(lambda o: consesus_succedeed(o['node'], o['branch_index'], o['utxo_history'], o['block_chain'], o['transactions'])),
+    ops.do_action(lambda o: o['node'].chain.set_max_common_index(
+        o['node'].chain.common_index + o['node'].chain.get_global_common_index([c for c in [h['hashes'] for h in o['ids_hashes']]]))),
+    ops.do_action(lambda o: print('new max common index: ', o['node'].chain.common_index))
 ).subscribe()
 
 #
@@ -263,3 +314,8 @@ rx.combine_latest(
     ops.do_action(lambda x: execute(x[0], x[1]))
 ).subscribe()
 
+
+# addTransactionS.pipe(
+#     node.current_block.append(t)
+
+# )

@@ -27,5 +27,7 @@ mytsxS = Subject()
 # consensus subject
 consensusS = Subject()
 
+consensusSucceededS = Subject()
+
 # miner subject
 minerS = Subject()

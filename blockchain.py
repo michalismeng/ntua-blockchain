@@ -3,13 +3,14 @@ import settings
 import jsonpickle as jp
 from copy import deepcopy
 from Crypto.Hash import SHA
+import utils
 
 class BlockChain:
 
     def __init__(self):
-        self.chain = []
-        self.UTXO_history = []
-        self.common_index = 1
+        self.chain = []             # list of blocks in the blockchain
+        self.UTXO_history = []      # UTXOS for every block
+        self.common_index = 1       # marks the index until which all nodes agree on the blockchain (actually one past that index)
     
     def get_recent_UTXOS(self):
         return self.UTXO_history[-1]
@@ -30,20 +31,8 @@ class BlockChain:
     def chain_to_hashes(self):
         return [block.current_hash for block in self.chain]
 
-    def get_max_prefex_block_chain(self, blocks, index):
-        for i, (my_block, other_block) in enumerate(zip(self.chain[index:], blocks)):
-            if my_block.current_hash != other_block.current_hash:
-                return i
-        
-        return len(self.chain[index:])
+    def get_global_common_index(self, all_hashes):
+        return min([utils.get_max_common_prefix_length(hash_chain, self.chain_to_hashes()[self.common_index:]) for hash_chain in all_hashes])
 
-    def get_max_prefex_chain(self, hashes):
-
-        for i, (my_hash, other_hash) in enumerate(zip(self.chain_to_hashes()[self.common_index:], hashes)):
-            if my_hash != other_hash:
-                return i
-
-        return min(len(hashes), len(self.chain_to_hashes()[self.common_index:]))
-
-    def set_max_common_index(self,hash_chains):
-        self.common_index += min([self.get_max_prefex_chain(hash_chain) for hash_chain in hash_chains])
+    def set_max_common_index(self, index):
+        self.common_index = index

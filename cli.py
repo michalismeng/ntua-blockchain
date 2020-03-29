@@ -3,6 +3,8 @@ from blockchain_subjects import mytsxS, blcS
 import block
 import os
 from communication import unicast
+from miner import Miner
+
 
 def execute(n, s):
     if s == 'exit':
@@ -18,8 +20,9 @@ def execute(n, s):
     elif s == 'all_utxos':
         print(n.get_all_UTXOS())
     elif s == 'chain':
+        print([c.current_hash for c in n.chain.chain])
         print(n.chain.get_block_indexes())
-        print(n.chain.UTXO_history)
+        # print(n.chain.UTXO_history)
     elif s == 'block':
         print(n.get_pending_transactions())
 
@@ -35,23 +38,36 @@ def execute(n, s):
         host = (n.ring[int(id)][0], n.ring[int(id)][1])
         unicast(host, 'add-transaction', { 'transaction': t})
 
+    elif s.startswith('th'):
+        _, id, amount = s.split(' ')
+        t = create_transaction(n, n.ring[int(id)][2], int(amount))
+        new_utxos = n.validate_transaction(t, n.get_all_UTXOS(), True)
+        if new_utxos == None:
+            print('ERROR')
+        n.set_all_utxos(new_utxos)
+        n.add_transaction_to_block(t)
+
     elif s.startswith('t'):
         _, id, amount = s.split(' ')
         mytsxS.on_next((n.ring[int(id)][2], int(amount)))
 
     elif s.startswith('b'):
         _, id = s.split(' ')
+
+        m = Miner()
         b = n.look_for_ore_block()
-        n.hier_miner()
-        n.miner.mine(b,n.id)
+        m.mine(b, n.id)
+
         print('found valid block')
         host = (n.ring[int(id)][0], n.ring[int(id)][1])
         unicast(host, 'add-block', { 'block': b })
 
     elif s.startswith('s'):
+        
+        m = Miner()
         b = n.look_for_ore_block()
-        n.hier_miner()
-        n.miner.mine(b,n.id)
+        m.mine(b, n.id)
+
         print('found valid block')
         # TODO: Create myblcs subject
         blcS.on_next(b)
