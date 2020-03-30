@@ -211,6 +211,7 @@ rx.combine_latest(
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nl: {'node': nl[0], 'tx': nl[2], 'utxos': nl[0].get_all_UTXOS()}),
+    ops.do_action(lambda o: print('Starting transaction: ', o['tx'].stringify(o['node']))),
 
     # verify transaction signature then calculate new utxos. If valid (not None) then update node utxos 
     ops.filter(lambda o: o['tx'].verify_transaction()),
@@ -238,7 +239,7 @@ rx.combine_latest(
     ops.map(lambda nl: {'node': nl[0], 'target': nl[1][0], 'amount': nl[1][1]}),
     ops.map(lambda o: {'node': o['node'], 'tx': create_transaction(o['node'],o['target'],o['amount']), 'utxos': o['node'].get_all_UTXOS()}),
 
-    ops.do_action(lambda o: broadcast(o['node'].get_other_hosts(), 'add-transaction', { 'transaction': o['tx'] })),
+    ops.do_action(lambda o: print('Starting my transaction: ', o['tx'].stringify(o['node']))),
     
     # verify transaction signature then calculate new utxos. If valid (not None) then update node utxos 
     ops.filter(lambda o: o['tx'].verify_transaction()),
@@ -250,6 +251,7 @@ rx.combine_latest(
     ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
 
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
+    ops.do_action(lambda o: broadcast(o['node'].get_other_hosts(), 'add-transaction', { 'transaction': o['tx'] })),
 
     miner_operator()
 ).subscribe()
@@ -314,7 +316,7 @@ rx.combine_latest(
     nodeS,
     consensusS
 ).pipe(
-    ops.observe_on(blockchain_thread_pool),
+    ops.observe_on(rx.scheduler.ImmediateScheduler()),
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nl: {'node': nl[0]}),

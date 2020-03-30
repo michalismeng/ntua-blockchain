@@ -98,7 +98,7 @@ class node:
                 current_balance += UTXOS_sender[id][1]
             else:
                 if verbose:
-                    print('Input not found')
+                    print('Input not found',t.stringify(self))
                 return None
 
         if current_balance < t.amount:
