@@ -3,13 +3,14 @@ from rx import operators as ops
 import rx.scheduler
 
 from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions, create_transaction
-from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS, minerS, consensusSucceededS
+from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS, minerS, consensusSucceededS, myblcS
 from cli import execute
 import settings
 from communication import broadcast,lazy_broadcast,unicast
 from threading import Thread
 import utils
 import threading
+import time
 
 # we define one common thread pool with one available thread to be used by all pipelines
 # this way they all run on the same thread => they are serialized and no concurrency control is required
@@ -38,6 +39,8 @@ even any scantling of your soul is Winslow no more, but is now itself the sea!
 def miner_operator():
     return rx.pipe(
         ops.filter(lambda o: len(o['node'].current_block) >= settings.capacity and not(o['node'].miner.running)),
+        ops.do_action(lambda o: print('starting Miner')),
+        ops.do_action(lambda o: o['node'].miner.set_running()),
         ops.do_action(lambda o: minerS.on_next(0))
     )
 
@@ -57,7 +60,7 @@ rx.combine_latest(
     ops.do_action(lambda o: print('I see something in me rock')),
     ops.filter(lambda o: o['block'].is_block_gold()),
     ops.do_action(lambda o: print('It is GOLD I tell ya')),
-    ops.do_action(lambda o: broadcast(o['node'].get_hosts(),'add-block', { 'block': o['block'] })),
+    ops.do_action(lambda o: myblcS.on_next(o['block'])),    
     ops.do_action(lambda o: print('Ya\'ll got me gold!')),
 ).subscribe()
 
@@ -157,8 +160,44 @@ rx.combine_latest(
     ops.do_action(lambda o: o['node'].miner.terminate()),
     
     ops.do_action(lambda o: o['node'].chain.add_block(o['bl'],o['utxos'])),
-    ops.do_action(lambda o: o['node'].clear_current_block()),
+    ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'new_state':o['node'].validate_transactions(o['node'].current_block, o['node'].chain.get_recent_UTXOS())}),
+    ops.do_action(lambda o: o['node'].set_current_block(o['new_state'][0])),
+    ops.do_action(lambda o: o['node'].set_all_utxos(o['new_state'][1])),
     ops.do_action(lambda o: print('Received block: ', o['bl'].stringify())),
+    miner_operator()
+).subscribe()
+
+# pipeline for my block
+rx.combine_latest(
+    nodeS,
+    myblcS,
+).pipe(
+    ops.observe_on(blockchain_thread_pool),
+    ops.do_action(lambda _: check_correct_running_thread()),
+
+    # ops.do_action(lambda o: print('BLOCK')),
+    # ops.do_action(lambda o: print(threading.currentThread().name)),
+
+    ops.map(lambda nl: {'node': nl[0], 'bl': nl[1]}),
+
+    # TODO: Consensus on next may need to be blocking (Immediate Scheduler)
+    #? Miner sends block, terminate miner, need consensus, miner block arrives in pipeline (changes blockchain), consensus happens
+
+    ops.filter(lambda o: o['bl'].verify_block(o['node'].chain.get_last_block())),
+    ops.do_action(lambda o: print('Verified block: ', o['bl'].stringify())),
+
+    ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'utxos': o['node'].validate_block(o['bl'],o['node'].chain.get_recent_UTXOS())}),
+    ops.filter(lambda o: o['utxos'] != None),
+    ops.do_action(lambda o: print('Validated block: ', o['bl'].stringify())),
+
+    
+    ops.do_action(lambda o: o['node'].chain.add_block(o['bl'],o['utxos'])),
+    ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'new_state':o['node'].validate_transactions(o['node'].current_block, o['node'].chain.get_recent_UTXOS())}),
+    ops.do_action(lambda o: o['node'].set_current_block(o['new_state'][0])),
+    ops.do_action(lambda o: o['node'].set_all_utxos(o['new_state'][1])),
+    ops.do_action(lambda o: print('Received block: ', o['bl'].stringify())),
+    ops.do_action(lambda o: o['node'].miner.terminate()),
+    ops.do_action(lambda o: broadcast(o['node'].get_other_hosts(),'add-block', { 'block': o['bl'] })),
     miner_operator()
 ).subscribe()
 
@@ -194,6 +233,7 @@ rx.combine_latest(
 ).pipe(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
+    ops.do_action(lambda _: time.sleep(1)),
 
     ops.map(lambda nl: {'node': nl[0], 'target': nl[1][0], 'amount': nl[1][1]}),
     ops.map(lambda o: {'node': o['node'], 'tx': create_transaction(o['node'],o['target'],o['amount']), 'utxos': o['node'].get_all_UTXOS()}),
@@ -229,7 +269,7 @@ def consesus_succedeed(node, branch_index, utxo_history, chain, transactions):
 
     valid_transactions, ring_utxos = node.validate_transactions(transactions_to_add, new_utxos[-1])
 
-    node.current_block = valid_transactions
+    node.set_current_block(valid_transactions)
     node.set_all_utxos(ring_utxos)
     
     node.chain.chain = new_chain

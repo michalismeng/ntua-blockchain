@@ -41,7 +41,6 @@ class Block:
 	def transaction_ids(self):
 		return [transaction.transaction_id for transaction in self.transactions]
 
-    # TODO: verify should not trigger consensus, instead return reason of success or failure
 	def verify_block(self, last_block, consensus_mode = False):
 		if str(self.__myHash__().hexdigest()) != self.current_hash:
 			return False
@@ -53,7 +52,7 @@ class Block:
 			return True
 
 		print('Invalid block.')
-		print(last_block.index)
+		print(self.stringify())
 		if self.index > last_block.index and not(consensus_mode):
 			print('Consensus is needed.')
 			consensusS.on_next(0)

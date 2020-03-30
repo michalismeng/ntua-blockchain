@@ -41,6 +41,14 @@ class RouterShell(cmd.Cmd):
             self.do_next('')
             time.sleep(0.5)
 
+    def do_script(self, args):
+        communication.broadcast(hosts, 'load-senario', { 'command': 'load ' + args })
+    
+    def do_start(self, args):
+        communication.broadcast(hosts, 'load-senario', { 'command': 'run'})
+    
+    def do_mine(self, args):
+        print(communication.broadcast(hosts, 'load-senario', { 'command': 'mining'}))
 
 if __name__ == '__main__':
     RouterShell().cmdloop()

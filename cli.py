@@ -69,6 +69,5 @@ def execute(n, s):
         m.mine(b, n.id)
 
         print('found valid block')
-        # TODO: Create myblcs subject
         blcS.on_next(b)
         do_block(n, b)

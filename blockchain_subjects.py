@@ -31,3 +31,6 @@ consensusSucceededS = Subject()
 
 # miner subject
 minerS = Subject()
+
+# myblock subject
+myblcS = Subject()

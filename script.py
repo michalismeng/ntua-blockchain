@@ -18,7 +18,7 @@ import jsonpickle as jp
 import time
 import threading
 import os
-
+from blockchain_subjects import mytsxS
 import cli
 
 # uncomment to disable FLASK messages
@@ -120,6 +120,26 @@ def get_data():
     node_count += 1
 
     return jsonify(response)
+
+@app.route('/load-senario', methods=['POST'])
+def load_senario():
+    global commands_script
+    command = jp.decode(request.data)['command']
+    n = current_node()
+    if command.startswith('load'):
+        file = command.split()[1]
+        with open('transactions/{}nodes/transactions{}.txt'.format(file, n.id), 'r') as f:
+            lines = f.readlines()
+            commands_script = [ (n.ring[int(x.split(' ')[0][2:])][2],int(x.split(' ')[1]))  for x in lines if int(x.split(' ')[0][2:]) < settings.N ] 
+            print('loaded {} commands'.format(len(commands_script)))
+            print(commands_script)
+    if command.startswith('run'):
+        for com in commands_script:
+            mytsxS.on_next(com)
+    if command.startswith('mining'):
+        return jsonify(n.miner.running)
+    return jsonify('OK')
+
 
 # bootstrap node
 if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):

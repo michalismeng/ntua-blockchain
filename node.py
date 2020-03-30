@@ -54,6 +54,9 @@ class node:
     def set_ring(self, ring):
         self.ring = ring
 
+    def set_current_block(self, transactions):
+        self.current_block = transactions
+
     def get_pending_transactions(self):
         return [t.transaction_id for t in self.current_block]
 
@@ -136,15 +139,6 @@ class node:
             return new_utxos
         else:
             return None
-
-    def clear_current_block(self):
-        # we clear our local current block (validated transaction pool)
-        # based on the new blockchain, we keep only valid transactions in our current block and update our utxos accordingly
-
-        # TODO: Move these to block pipeline
-        valid_transactions, new_utxos = self.validate_transactions(self.current_block, self.chain.get_recent_UTXOS())
-        self.current_block = valid_transactions
-        self.set_all_utxos(new_utxos)
 
     def add_transaction_to_block(self, t):
         self.current_block.append(t)
