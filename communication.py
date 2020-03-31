@@ -26,14 +26,3 @@ def broadcast(hosts, api, message):
             timeouts.append((ip, port))
     
     return responses
-
-def lazy_broadcast(hosts, api, message):
-    message = jp.encode(message, keys=True)
-
-    for ip, port in hosts:
-        try:
-            response = requests.post('http://{}:{}/{}'.format(ip, port, api), message)
-            yield jp.decode(response.text, keys = True)
-
-        except requests.exceptions.Timeout:
-            yield (ip, port)

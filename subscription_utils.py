@@ -3,8 +3,7 @@ import threading
 import os
 import block
 import transaction
-from communication import broadcast
-from blockchain_subjects import mytsxS
+from blockchain_subjects import mytsxS, broadcastS
 import time
 
 # debug function to ensure all subscriptions run on the same thread
@@ -27,12 +26,12 @@ def create_transaction(sender_node, target_key, amount):
 
 def do_genesis_block(bootstrap_node):
     gen_block = block.Block.genesis(bootstrap_node.wallet.address)
-    broadcast(bootstrap_node.get_hosts(), 'add-block', { 'block': gen_block })
+    broadcastS.on_next((bootstrap_node.get_hosts(), 'add-block', { 'block': gen_block }))
 
 def do_block(sender_node, block):
-    broadcast(sender_node.get_other_hosts(), 'add-block', { 'block': block })
+    broadcastS.on_next((sender_node.get_other_hosts(), 'add-block', { 'block': block }))
 
 def do_broadcast_ring(bootstrap_node):
     print('broadcating ring to all nodes...')
-    broadcast(bootstrap_node.get_hosts(), 'get-ring', { 'ring': bootstrap_node.ring })
+    broadcastS.on_next((bootstrap_node.get_hosts(), 'get-ring', { 'ring': bootstrap_node.ring }))
     do_genesis_block(bootstrap_node)

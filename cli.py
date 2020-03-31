@@ -2,12 +2,19 @@ from subscription_utils import do_block, create_transaction
 from blockchain_subjects import mytsxS, blcS
 import block
 import os
+import time
+import random
 from communication import unicast
 from miner import Miner
 
 
 def execute(n, s):
-    if s == 'exit':
+    if s == 'special':
+        random.seed(9001 * n.id)
+        for com in n.commands_script:
+            time.sleep(random.uniform(0,3))
+            mytsxS.on_next(com)
+    elif s == 'exit':
         os._exit(0)
     elif s == 'utxos':
         print(n.get_node_UTXOS(n.id))

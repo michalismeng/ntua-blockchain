@@ -23,13 +23,14 @@ class node:
         self.miner = Miner()
         # here we store information for every node, its (ip:port) its public key and its UTXOS ({ sender address: receiver id, amount })
         self.ring = []
+        self.commands_script = []
         self.current_node_count = len(self.ring)
 
     def get_suffisient_UTXOS(self, ammount):
         UTXOS = self.get_node_UTXOS(self.id)
         t_ids = []
         balance = 0
-        for id in UTXOS:
+        for id in [k for k, _ in sorted(UTXOS.items(), key=lambda item: item[1][1])]:
             if balance >= ammount:
                 break
             balance += UTXOS[id][1]
@@ -177,14 +178,3 @@ class node:
             temp_UTXOS.append(new_UTXOS)
 
         return temp_UTXOS[1:], index + max_common_index, transactions
-
-    # def broadcast_block():
-
-    # def valid_proof(.., difficulty=MINING_DIFFICULTY):
-
-    # #concencus functions
-
-    # def valid_chain(self, chain):
-    # 	#check for the longer chain accroose all nodes
-    # def resolve_conflicts(self):
-    # 	#resolve correct chain

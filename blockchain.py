@@ -36,3 +36,4 @@ class BlockChain:
 
     def set_max_common_index(self, index):
         self.common_index = index
+        self.UTXO_history =  [0 for _ in self.UTXO_history[:self.common_index-1]] + self.UTXO_history[self.common_index-1:]

@@ -34,3 +34,6 @@ minerS = Subject()
 
 # myblock subject
 myblcS = Subject()
+
+# broadcast subject
+broadcastS = Subject()

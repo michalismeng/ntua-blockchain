@@ -47,8 +47,40 @@ class RouterShell(cmd.Cmd):
     def do_start(self, args):
         communication.broadcast(hosts, 'load-senario', { 'command': 'run'})
     
+    def do_sst(self, args):
+        communication.broadcast(hosts, 'load-senario', { 'command': 'load ' + args })
+        communication.broadcast(hosts, 'load-senario', { 'command': 'run'})
+    
     def do_mine(self, args):
         print(communication.broadcast(hosts, 'load-senario', { 'command': 'mining'}))
+
+    def do_stats(self, args):
+        stats = communication.broadcast(hosts, 'get-stats', { })
+        min_time = stats[0]['tsx'][settings.N-1][0]
+        max_time = stats[0]['blc'][-1][0]
+        trx = 0
+        res2 = []
+        for stat in stats:
+            print(stat['id'])
+            print(stat['tsx'][settings.N-1],stat['blc'][-1])
+            print(len(stat['tsx'][settings.N-1:]),len(stat['vtsx'][settings.N-1:]),stat['ptsx'])
+            print(stat['blc'][-1][0] - stat['tsx'][settings.N-1][0])
+
+            res2.append(sum([x for x,_,_ in stat['mblc']]) / len(stat['mblc']))            
+
+            trx += stat['ptsx']
+            if stat['tsx'][settings.N-1][0] < min_time:
+                min_time = stat['tsx'][settings.N-1][0]
+            if stat['blc'][-1][0] >  max_time:
+                max_time = stat['blc'][-1][0]
+        
+        res = trx / (max_time - min_time)
+
+        print('The result for throuhput is: {}'.format(res))
+        print('The result for block is: {}'.format(res2))
+
+        
+
 
 if __name__ == '__main__':
     RouterShell().cmdloop()

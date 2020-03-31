@@ -3,10 +3,10 @@ from rx import operators as ops
 import rx.scheduler
 
 from subscription_utils import do_broadcast_ring, check_correct_running_thread, do_bootstrap_transactions, create_transaction
-from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS, minerS, consensusSucceededS, myblcS
+from blockchain_subjects import nodeS, node_countS, ringS, genesisS, blcS, tsxS, mytsxS, commandS, consensusS, minerS, consensusSucceededS, myblcS, broadcastS
 from cli import execute
 import settings
-from communication import broadcast,lazy_broadcast,unicast
+from communication import broadcast,unicast
 from threading import Thread
 import utils
 import threading
@@ -17,6 +17,11 @@ import time
 blockchain_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
 cli_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
 miner_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
+block_mining_time_stamp = 0
+
+def set_block_mining_time_stamp():
+    global block_mining_time_stamp
+    block_mining_time_stamp = time.time()
 
 #
 #   MAIN PROGRAM PIPELINES
@@ -55,6 +60,7 @@ rx.combine_latest(
     ops.do_action(lambda o: print('Entering miner')),
     ops.map(lambda nc: {'node': nc[0]}),
     ops.map(lambda o: {'node':o['node'], 'block':o['node'].look_for_ore_block()}),
+    ops.do_action(lambda o: set_block_mining_time_stamp()),
     ops.do_action(lambda o: print('Har Har Har found the ore')),
     ops.do_action(lambda o: o['node'].miner.mine(o['block'],o['node'].id)),
     ops.do_action(lambda o: print('I see something in me rock')),
@@ -142,16 +148,10 @@ rx.combine_latest(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
 
-    # ops.do_action(lambda o: print('BLOCK')),
-    # ops.do_action(lambda o: print(threading.currentThread().name)),
-
     ops.map(lambda nl: {'node': nl[0], 'bl': nl[1]}),
 
     # check that this is not a genesis block
     ops.filter(lambda o: o['bl'].previous_hash != 1),
-
-    # TODO: Consensus on next may need to be blocking (Immediate Scheduler)
-    #? Miner sends block, terminate miner, need consensus, miner block arrives in pipeline (changes blockchain), consensus happens
 
     ops.filter(lambda o: o['bl'].verify_block(o['node'].chain.get_last_block())),
     ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'utxos': o['node'].validate_block(o['bl'],o['node'].chain.get_recent_UTXOS())}),
@@ -164,6 +164,7 @@ rx.combine_latest(
     ops.do_action(lambda o: o['node'].set_current_block(o['new_state'][0])),
     ops.do_action(lambda o: o['node'].set_all_utxos(o['new_state'][1])),
     ops.do_action(lambda o: print('Received block: ', o['bl'].stringify())),
+    ops.do_action(lambda o: settings.block_validation_time_stamps.append((time.time(),o['bl'].index,o['bl'].current_hash))),
     miner_operator()
 ).subscribe()
 
@@ -175,13 +176,7 @@ rx.combine_latest(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
 
-    # ops.do_action(lambda o: print('BLOCK')),
-    # ops.do_action(lambda o: print(threading.currentThread().name)),
-
     ops.map(lambda nl: {'node': nl[0], 'bl': nl[1]}),
-
-    # TODO: Consensus on next may need to be blocking (Immediate Scheduler)
-    #? Miner sends block, terminate miner, need consensus, miner block arrives in pipeline (changes blockchain), consensus happens
 
     ops.filter(lambda o: o['bl'].verify_block(o['node'].chain.get_last_block())),
     ops.do_action(lambda o: print('Verified block: ', o['bl'].stringify())),
@@ -196,8 +191,10 @@ rx.combine_latest(
     ops.do_action(lambda o: o['node'].set_current_block(o['new_state'][0])),
     ops.do_action(lambda o: o['node'].set_all_utxos(o['new_state'][1])),
     ops.do_action(lambda o: print('Received block: ', o['bl'].stringify())),
+    ops.do_action(lambda o: settings.block_validation_time_stamps.append((time.time(),o['bl'].index,o['bl'].current_hash))),
+    ops.do_action(lambda o: settings.block_mining_time_stamps.append((time.time() - block_mining_time_stamp,o['bl'].index,o['bl'].current_hash))),
     ops.do_action(lambda o: o['node'].miner.terminate()),
-    ops.do_action(lambda o: broadcast(o['node'].get_other_hosts(),'add-block', { 'block': o['bl'] })),
+    ops.do_action(lambda o: broadcastS.on_next((o['node'].get_other_hosts(),'add-block', { 'block': o['bl'] }))),
     miner_operator()
 ).subscribe()
 
@@ -209,9 +206,8 @@ rx.combine_latest(
 ).pipe(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
-
     ops.map(lambda nl: {'node': nl[0], 'tx': nl[2], 'utxos': nl[0].get_all_UTXOS()}),
-    ops.do_action(lambda o: print('Starting transaction: ', o['tx'].stringify(o['node']))),
+    ops.do_action(lambda o: settings.transaction_time_stamps.append((time.time(),o['tx'].transaction_id))),
 
     # verify transaction signature then calculate new utxos. If valid (not None) then update node utxos 
     ops.filter(lambda o: o['tx'].verify_transaction()),
@@ -223,7 +219,7 @@ rx.combine_latest(
     ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
 
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
-
+    ops.do_action(lambda o: settings.v_transactions.append((time.time(),o['tx'].transaction_id))),
     miner_operator()
 ).subscribe()
 
@@ -234,13 +230,12 @@ rx.combine_latest(
 ).pipe(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
-    ops.do_action(lambda _: time.sleep(1)),
 
     ops.map(lambda nl: {'node': nl[0], 'target': nl[1][0], 'amount': nl[1][1]}),
     ops.map(lambda o: {'node': o['node'], 'tx': create_transaction(o['node'],o['target'],o['amount']), 'utxos': o['node'].get_all_UTXOS()}),
 
-    ops.do_action(lambda o: print('Starting my transaction: ', o['tx'].stringify(o['node']))),
-    
+    ops.do_action(lambda o: settings.transaction_time_stamps.append((time.time(),o['tx'].transaction_id))),
+
     # verify transaction signature then calculate new utxos. If valid (not None) then update node utxos 
     ops.filter(lambda o: o['tx'].verify_transaction()),
 
@@ -251,7 +246,8 @@ rx.combine_latest(
     ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
 
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
-    ops.do_action(lambda o: broadcast(o['node'].get_other_hosts(), 'add-transaction', { 'transaction': o['tx'] })),
+    ops.do_action(lambda o: settings.v_transactions.append((time.time(),o['tx'].transaction_id))),
+    ops.do_action(lambda o: broadcastS.on_next((o['node'].get_other_hosts(), 'add-transaction', { 'transaction': o['tx'] }))),
 
     miner_operator()
 ).subscribe()
@@ -356,8 +352,7 @@ rx.combine_latest(
     ops.do_action(lambda x: execute(x[0], x[1]))
 ).subscribe()
 
-
-# addTransactionS.pipe(
-#     node.current_block.append(t)
-
-# )
+broadcastS.pipe(
+    ops.observe_on(rx.scheduler.NewThreadScheduler()),
+    ops.do_action(lambda o: broadcast(o[0],o[1],o[2]))
+).subscribe()

@@ -8,12 +8,11 @@ import sys
 import json
 from flask import Flask, jsonify, request, render_template, make_response
 
-from communication import broadcast, unicast
 from settings import bootstrap_ip, bootstrap_port
 import utils
 import settings
 import transaction
-
+from random import uniform
 import jsonpickle as jp
 import time
 import threading
@@ -87,7 +86,6 @@ def add_block():
 def request_chain_hash():
     args = jp.decode(request.data)
     n = current_node()
-    #TODO: use hashes only after index
     hashes = n.chain.chain_to_hashes()
     result = { 'hashes': hashes[args['index']:], 'id': n.id }
     print('Hash chain sent')
@@ -130,16 +128,29 @@ def load_senario():
         file = command.split()[1]
         with open('transactions/{}nodes/transactions{}.txt'.format(file, n.id), 'r') as f:
             lines = f.readlines()
-            commands_script = [ (n.ring[int(x.split(' ')[0][2:])][2],int(x.split(' ')[1]))  for x in lines if int(x.split(' ')[0][2:]) < settings.N ] 
+            commands_script = [ (n.ring[int(x.split(' ')[0][2:])][2],int(x.split(' ')[1]))  for x in lines if int(x.split(' ')[0][2:]) < settings.N ]
+            n.commands_script = commands_script
             print('loaded {} commands'.format(len(commands_script)))
             print(commands_script)
+            settings.pure_transactions = len(commands_script)
     if command.startswith('run'):
-        for com in commands_script:
-            mytsxS.on_next(com)
+        commandS.on_next('special')
     if command.startswith('mining'):
         return jsonify(n.miner.running)
     return jsonify('OK')
 
+@app.route('/get-stats', methods=['POST'])
+def get_stat():
+    n = current_node()
+    stats = {'id': n.id,
+            'tsx': settings.transaction_time_stamps,
+            'blc': settings.block_validation_time_stamps,
+            'vtsx': settings.v_transactions,
+            'ptsx': settings.pure_transactions,
+            'mblc': settings.block_mining_time_stamps}
+    response = make_response(jp.encode(stats), 200)
+    response.mimetype = "text/plain"
+    return response
 
 # bootstrap node
 if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
