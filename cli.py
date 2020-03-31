@@ -12,7 +12,7 @@ def execute(n, s):
     if s == 'special':
         random.seed(9001 * n.id)
         for com in n.commands_script:
-            time.sleep(random.uniform(0,3))
+            time.sleep(random.uniform(0,0.5))
             mytsxS.on_next(com)
     elif s == 'exit':
         os._exit(0)
@@ -23,7 +23,8 @@ def execute(n, s):
         if len(values) == 1:        # if no argument is supplied, assume current node balance is requested
             values.append(n.id)
         for id in values[1:]:
-            print('Balance of node {}: {}'.format(id, n.get_node_balance(int(id))))
+            print('Balance of node {}: {}'.format(
+                id, n.get_node_balance(int(id))))
     elif s == 'all_utxos':
         print(n.get_all_UTXOS())
     elif s == 'chain':
@@ -35,7 +36,7 @@ def execute(n, s):
 
     elif s == 'ci':
         print(n.chain.common_index)
-    
+
     elif s == 'mine':
         print(n.look_for_ore_block().current_hash)
 
@@ -43,7 +44,7 @@ def execute(n, s):
         _, id, amount = s.split(' ')
         t = create_transaction(n, n.ring[int(id)][2], int(amount))
         host = (n.ring[int(id)][0], n.ring[int(id)][1])
-        unicast(host, 'add-transaction', { 'transaction': t})
+        unicast(host, 'add-transaction', {'transaction': t})
 
     elif s.startswith('th'):
         _, id, amount = s.split(' ')
@@ -67,10 +68,10 @@ def execute(n, s):
 
         print('found valid block')
         host = (n.ring[int(id)][0], n.ring[int(id)][1])
-        unicast(host, 'add-block', { 'block': b })
+        unicast(host, 'add-block', {'block': b})
 
     elif s.startswith('s'):
-        
+
         m = Miner()
         b = n.look_for_ore_block()
         m.mine(b, n.id)
