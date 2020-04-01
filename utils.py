@@ -6,6 +6,7 @@ import wallet
 import node
 import block
 import settings
+import random
 
 # should be called by the bootstrap node
 def register_node_to_ring(bootstrap_node, node, ip, port, public_key):
@@ -21,7 +22,7 @@ def create_node(ip, port):
 
     response = communication.unicast_bootstrap("enter-ring", message)
     myid = response["id"]
-
+    random.seed(9001 * int(myid))
     return node.node(myid, ip, port, node_wallet)
 
 def create_bootstrap_node():
@@ -29,6 +30,7 @@ def create_bootstrap_node():
 
     node_boot = node.node(0, bootstrap_ip, bootstrap_port, node_wallet)
     register_node_to_ring(node_boot, node_boot, bootstrap_ip, bootstrap_port, node_wallet.address)
+    random.seed(9001 * int(0))
     return node_boot
 
 def startThreadedServer(app, ip, port):

@@ -17,12 +17,22 @@ class RouterShell(cmd.Cmd):
     def do_exec(self, args):
         communication.broadcast(hosts, 'execute-command', { 'command': 'exec ' + args })
 
-    def do_ping_all(self, args):
-        ids = communication.broadcast(hosts, 'management', { 'command': 'echo-id' })
-        for id in ids:
-            print('Node {} is alive'.format(id))
-        if len(ids) == len(hosts):
-            print('All nodes are alive')
+    def do_manage(self, args):
+        if args.split(' ')[0] == 'ping':
+            ids = communication.broadcast(hosts, 'management', { 'command': 'echo-id' })
+            for id in ids:
+                print('Node {} is alive'.format(id))
+            if len(ids) == len(hosts):
+                print('All nodes are alive')
+        elif args.split(' ')[0] == 'balance':
+            id_balance = communication.broadcast(hosts, 'management', { 'command': 'balance' })
+            for id,balance in id_balance:
+                print('Node {} has balance {}'.format(id,balance))
+        elif args.split(' ')[0] == 'chain':
+            chains = communication.broadcast(hosts, 'management', { 'command': 'chain' })
+            for id,chain in chains:
+                print('Node {} has chain:'.format(id))
+                print(chain)
 
     def do_sst(self, args):
         communication.broadcast(hosts, 'load-senario', { 'command': 'load ' + args })
@@ -56,7 +66,7 @@ class RouterShell(cmd.Cmd):
         print('The result for throuhput is: {}'.format(res))
         print('The result for block is: {}'.format(res2))
 
-        
+    
 if __name__ == '__main__':
     hosts = communication.unicast_bootstrap('management', { 'command': 'hosts' })
     RouterShell(hosts).cmdloop()

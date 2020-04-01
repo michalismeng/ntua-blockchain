@@ -11,7 +11,7 @@ if os.environ['env'] == 'local':
     bootstrap_port=25000
     N = 2
     capacity = 5
-    difficulty = 4
+    difficulty = 3
 elif os.environ['env'] == 'remote':
     print('Setting up as remote environment')
     bootstrap_ip='192.168.1.3'

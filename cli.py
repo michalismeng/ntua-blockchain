@@ -10,9 +10,7 @@ from miner import Miner
 
 def execute(n, s):
     if s == 'special':
-        random.seed(9001 * n.id)
         for com in n.commands_script:
-            time.sleep(random.uniform(0,0.5))
             mytsxS.on_next(com)
     elif s == 'exit':
         os._exit(0)

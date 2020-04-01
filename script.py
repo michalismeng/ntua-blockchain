@@ -128,10 +128,17 @@ def execute_command():
 def management_endpoint():
     global commands_script, command_index
     command = jp.decode(request.data)['command']
+    n = current_node()
     if command.startswith('hosts'):
         return jsonify(current_node().get_hosts())
     elif command.startswith('echo-id'):
         return jsonify((current_node().id))
+    elif command.startswith('balance'):
+        return jsonify((n.id, n.get_node_balance(int(n.id))))
+    elif command.startswith('chain'):
+        response = make_response(jp.encode((n.id,n.chain.get_block_indexes()),keys=True), 200)
+        response.mimetype = "text/plain"
+        return response
     return jsonify('OK')
 
 @app.route('/get-stats', methods=['POST'])
