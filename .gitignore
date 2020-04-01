@@ -1,4 +1,5 @@
-*
-!*.py
-!.gitignore
-!requirements.txt
+__pycache__
+scripts
+kodikoi
+README.txt
+*.sh
