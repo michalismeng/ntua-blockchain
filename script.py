@@ -35,33 +35,6 @@ app = Flask(__name__)
 def create_global_variable(name, value):
     if name not in globals():
         globals()[name] = value
-
-@app.route('/execute-command', methods=['POST'])
-def execute_command():
-    global commands_script, command_index
-    command = jp.decode(request.data)['command']
-    if command.startswith('load'):
-        file = command.split()[1]
-        command_index = 0
-        with open('scripts/{}'.format(file), 'r') as f:
-            lines = f.readlines()
-            commands_script = [x.strip() for x in lines] 
-            print('loaded {} commands'.format(len(commands_script)))
-    elif command.startswith('exec'):
-        command = command.split()[1:]
-        args = command.split()
-        ids = args[0].split(',')
-        if 'id{}'.format(current_node().id) in ids:
-            cli.execute(current_node(), ' '.join(args[1:]))
-    elif command == 'next':
-        command = commands_script[command_index]
-        command_index += 1
-        args = command.split()
-        ids = args[0].split(',')
-        if 'id{}'.format(current_node().id) in ids:
-            cli.execute(current_node(), ' '.join(args[1:]))
-
-    return jsonify('OK')
     
 
 @app.route('/get-ring', methods=['POST'])
@@ -139,6 +112,28 @@ def load_senario():
         return jsonify(n.miner.running)
     return jsonify('OK')
 
+@app.route('/execute-command', methods=['POST'])
+def execute_command():
+    global commands_script, command_index
+    command = jp.decode(request.data)['command']
+    if command.startswith('exec'):
+        args = command.split()[1:]
+        ids = args[0].split(',')
+        if 'id{}'.format(current_node().id) in ids:
+            cli.execute(current_node(), ' '.join(args[1:]))
+
+    return jsonify('OK')
+
+@app.route('/management', methods=['POST'])
+def management_endpoint():
+    global commands_script, command_index
+    command = jp.decode(request.data)['command']
+    if command.startswith('hosts'):
+        return jsonify(current_node().get_hosts())
+    elif command.startswith('echo-id'):
+        return jsonify((current_node().id))
+    return jsonify('OK')
+
 @app.route('/get-stats', methods=['POST'])
 def get_stat():
     n = current_node()
@@ -167,11 +162,6 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
     bootstrap_node = utils.create_bootstrap_node()
     nodeS.on_next(bootstrap_node)
 
-    while True:
-        x = input()
-        commandS.on_next(x)
-
-
 # non-bootstrap nodes
 else:
     if len(sys.argv) != 3:
@@ -181,8 +171,6 @@ else:
     ip = sys.argv[1]
     port = int(sys.argv[2])
 
-    # time.sleep(0.2)
-
     def current_node(): 
         global miner_node
         return miner_node
@@ -190,8 +178,3 @@ else:
     utils.startThreadedServer(app, ip, port)
     miner_node = utils.create_node(ip, port)
     nodeS.on_next(miner_node)
-
-    while True:
-        x = input()
-        commandS.on_next(x)
-        
