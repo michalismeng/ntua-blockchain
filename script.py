@@ -166,9 +166,9 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
 
     print('Creating bootstrap node')
 
-    utils.startThreadedServer(app, bootstrap_ip, bootstrap_port)
     bootstrap_node = utils.create_bootstrap_node()
     nodeS.on_next(bootstrap_node)
+    utils.startThreadedServer(app, bootstrap_ip, bootstrap_port)
 
 # non-bootstrap nodes
 else:
@@ -183,6 +183,6 @@ else:
         global miner_node
         return miner_node
 
-    utils.startThreadedServer(app, ip, port)
     miner_node = utils.create_node(ip, port)
     nodeS.on_next(miner_node)
+    utils.startThreadedServer(app, ip, port)

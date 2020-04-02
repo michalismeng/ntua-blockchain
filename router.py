@@ -61,16 +61,18 @@ class RouterShell(cmd.Cmd):
         max_time = stats[0]['blc'][-1][0]
         trx = 0
         res2 = []
+        res22 = []
         for stat in stats:
             print('Node', stat['id'])
-            print('Total transactions received: ', len(stat['tsx'][settings.N-1:]))
-            print('Total valid transactions: ', len(stat['vtsx'][settings.N-1:]))
+            print('Total transactions received: ', len(stat['tsx']))
+            print('Total valid transactions: ', len(stat['vtsx']))
             print('Total transactions issued: ', stat['ptsx'])
 
             if len(stat['mblc']) == 0:
                 res2.append('NaN')
             else:
-                res2.append(sum([x for x,_,_ in stat['mblc']]) / len(stat['mblc']))            
+                res2.append(sum([x for x,_,_ in stat['mblc']]) / len(stat['mblc']))         
+                res22.append(geomean([x for x,_,_ in stat['mblc']]))   
 
             trx += stat['ptsx']
             if stat['tsx'][settings.N-1][0] < min_time:
@@ -82,6 +84,9 @@ class RouterShell(cmd.Cmd):
 
         print('Transaction throughput: {}'.format(res))
         print('Block time for each node: {}'.format(res2))
+        print('Geomean Block time for each node: {}'.format(res22))
+        print('Mean of block time: {}'.format(geomean(res2)))
+        print('Geomean of block time: {}'.format(geomean(res22)))
 
     
 if __name__ == '__main__':

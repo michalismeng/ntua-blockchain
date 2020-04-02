@@ -1,4 +1,3 @@
-import blockchain
 import time
 import settings
 from transaction import Transaction
@@ -31,7 +30,7 @@ class Block:
 		return b
 	
 	def __myHash__(self):
-		hashString = jp.encode((self.index,self.timestamp,self.transactions,self.nonce,self.previous_hash))
+		hashString = jp.encode((self.index,self.timestamp,[t.transaction_id for t in self.transactions],self.nonce,self.previous_hash))
 		return SHA.new(hashString.encode())
 
 	# transaction and block capacity must have already been validated
