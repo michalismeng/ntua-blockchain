@@ -22,7 +22,7 @@ def create_node(ip, port):
 
     response = communication.unicast_bootstrap("enter-ring", message)
     myid = response["id"]
-    random.seed(9001 * int(myid))
+    # random.seed(9001 * int(myid))
     return node.node(myid, ip, port, node_wallet)
 
 def create_bootstrap_node():
@@ -30,13 +30,15 @@ def create_bootstrap_node():
 
     node_boot = node.node(0, bootstrap_ip, bootstrap_port, node_wallet)
     register_node_to_ring(node_boot, node_boot, bootstrap_ip, bootstrap_port, node_wallet.address)
-    random.seed(9001 * int(0))
+    # random.seed(9001 * int(0))
     return node_boot
 
 def startThreadedServer(app, ip, port):
-    x = threading.Thread(target=lambda ip, port: app.run(host=ip, port=port), args=(ip, port))
-    x.start()
-    return x
+    # x = threading.Thread(target=lambda ip, port: app.run(host=ip, port=port), args=(ip, port))
+    # x.start()
+
+    app.run(host=ip, port=port)
+    return
 
 def get_max_common_prefix_length(list1, list2):
     # l = [item1 != item2 for item1, item2 in zip(list1, list2)] + [1]

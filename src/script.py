@@ -99,7 +99,7 @@ def load_senario():
     n = current_node()
     if command.startswith('load'):
         file = command.split()[1]
-        with open('transactions/{}nodes/transactions{}.txt'.format(file, n.id), 'r') as f:
+        with open('../transactions/{}nodes/transactions{}.txt'.format(file, n.id), 'r') as f:
             lines = f.readlines()
             commands_script = [ (n.ring[int(x.split(' ')[0][2:])][2],int(x.split(' ')[1]))  for x in lines if int(x.split(' ')[0][2:]) < settings.N ]
             n.commands_script = commands_script
@@ -130,12 +130,18 @@ def management_endpoint():
     n = current_node()
     if command.startswith('hosts'):
         return jsonify(n.get_hosts())
+    elif command.startswith('config'):
+        return jsonify((settings.N, settings.capacity, settings.difficulty))
     elif command.startswith('echo-id'):
         return jsonify((n.id, n.ring[n.id][0], n.ring[n.id][1]))
     elif command.startswith('balance'):
         return jsonify((n.id, [(id, n.get_node_balance(id)) for id in range(settings.N)]))
     elif command.startswith('mining'):
         return jsonify(n.miner.running)
+    elif command.startswith('view'):
+        txs = n.chain.get_last_block().transactions
+        txs = [(n.address_to_id(tx.sender_address), n.address_to_id(tx.receiver_address), tx.amount) for tx in txs]
+        return jsonify((n.id, txs))
     elif command.startswith('chain'):
         response = make_response(jp.encode((n.id,n.chain.get_block_indexes()),keys=True), 200)
         response.mimetype = "text/plain"
@@ -166,9 +172,9 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
 
     print('Creating bootstrap node')
 
-    utils.startThreadedServer(app, bootstrap_ip, bootstrap_port)
     bootstrap_node = utils.create_bootstrap_node()
     nodeS.on_next(bootstrap_node)
+    utils.startThreadedServer(app, bootstrap_ip, bootstrap_port)
 
 # non-bootstrap nodes
 else:
@@ -183,6 +189,6 @@ else:
         global miner_node
         return miner_node
 
-    utils.startThreadedServer(app, ip, port)
     miner_node = utils.create_node(ip, port)
     nodeS.on_next(miner_node)
+    utils.startThreadedServer(app, ip, port)
