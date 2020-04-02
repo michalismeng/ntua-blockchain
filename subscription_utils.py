@@ -8,11 +8,11 @@ import time
 
 # debug function to ensure all subscriptions run on the same thread
 def check_correct_running_thread():
-    if threading.currentThread().name != "ThreadPoolExecutor-0_0":
-        print('Subscription runs on wrong thread')
-        print('terminating...')
-        os._exit(0)
-
+    # if threading.currentThread().name != "ThreadPoolExecutor-0_0":
+    #     print('Subscription runs on wrong thread')
+    #     print('terminating...')
+    #     os._exit(0)
+    pass
 # execute first N - 1 transactions to all node except the bootstrap node
 def do_bootstrap_transactions(bootstrap_node):
     for _, _, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
