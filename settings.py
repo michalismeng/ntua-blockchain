@@ -5,20 +5,24 @@ if 'env' not in os.environ:
     print('Environment variable not set.')
     os._exit(1)
     
-if os.environ['env'] == 'local':
-    print('Setting up as local environment')
+if os.environ['env'].startswith('local'):
     bootstrap_ip='127.0.0.1'
     bootstrap_port=25000
-    N = 2
-    capacity = 5
-    difficulty = 3
-elif os.environ['env'] == 'remote':
-    print('Setting up as remote environment')
+    if '-' in os.environ['env']:
+        N, capacity, difficulty = [int(x) for x in os.environ['env'].split('-')[1:]]
+    else:
+        N = 2
+        capacity = 5
+        difficulty = 3
+    print('Setting up as local environment with N={}, capacity={}, difficulty={}'.format(N, capacity, difficulty))
+elif os.environ['env'].startswith('remote'):
+    if '-' not in os.environ['env']:
+        print('Remote environment must be remote-[N]-[capacity]-[difficulty]')
+        os._exit(1)
     bootstrap_ip='192.168.1.3'
     bootstrap_port=25000
-    N = 5
-    capacity = 5
-    difficulty = 4
+    N, capacity, difficulty = [int(x) for x in os.environ['env'].split('-')[1:]]
+    print('Setting up as remote environment with N={}, capacity={}, difficulty={}'.format(N, capacity, difficulty))
 else:
     print('Bad environment.')
     os._exit(1)

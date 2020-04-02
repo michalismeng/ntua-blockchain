@@ -5,6 +5,11 @@ import communication
 import settings
 import cmd, sys
 import time
+from functools import reduce
+
+def geomean(array):
+    filtered = [x for x in array if x != 'NaN']
+    return reduce(lambda x, y: x * y, filtered) ** (1/len(filtered))
 
 class RouterShell(cmd.Cmd):
     def __init__(self, hosts):
@@ -14,33 +19,42 @@ class RouterShell(cmd.Cmd):
     intro = 'Welcome to noobcoin\n'
     prompt = '(client) '
 
+    # Old and dirty API
     def do_exec(self, args):
         communication.broadcast(hosts, 'execute-command', { 'command': 'exec ' + args })
 
-    def do_manage(self, args):
-        if args.split(' ')[0] == 'ping':
-            ids = communication.broadcast(hosts, 'management', { 'command': 'echo-id' })
-            for id in ids:
-                print('Node {} is alive'.format(id))
-            if len(ids) == len(hosts):
-                print('All nodes are alive')
-        elif args.split(' ')[0] == 'balance':
-            id_balance = communication.broadcast(hosts, 'management', { 'command': 'balance' })
-            for id,balance in id_balance:
-                print('Node {} has balance {}'.format(id,balance))
-        elif args.split(' ')[0] == 'chain':
-            chains = communication.broadcast(hosts, 'management', { 'command': 'chain' })
-            for id,chain in chains:
-                print('Node {} has chain:'.format(id))
-                print(chain)
+    # Management
+    def do_ping(self, args):
+        nodes = communication.broadcast(hosts, 'management', { 'command': 'echo-id' })
+        for id, ip, port in nodes:
+            print('Node {} is alive at {}:{}'.format(id, ip, port))
 
-    def do_sst(self, args):
-        communication.broadcast(hosts, 'load-senario', { 'command': 'load ' + args })
-        communication.broadcast(hosts, 'load-senario', { 'command': 'run'})
-    
+        if len(nodes) == len(hosts):
+            print('All nodes are alive')
+        else:
+            print('Warning! Some nodes did not respond')
+
+    def do_balance(self, args):
+        id_balance = communication.broadcast(hosts, 'management', { 'command': 'balance' })
+        for node_id, balances in id_balance:
+            print('Node {} has balances: ({})'.format(node_id, ' '.join([str((id, balance)) for id, balance in balances])))
+
+    def do_chain(self, args):
+        chains = communication.broadcast(hosts, 'management', { 'command': 'chain' })
+        for id, chain in chains:
+            print('Node {} has chain indices:'.format(id))
+            print(chain)
+
     def do_mine(self, args):
-        print(communication.broadcast(hosts, 'load-senario', { 'command': 'mining'}))
+        print('Nodes that are mining')
+        print(communication.broadcast(hosts, 'management', { 'command': 'mining' }))
 
+    # Load and start simulation
+    def do_sst(self, args):
+        communication.broadcast(hosts, 'load-simulation', { 'command': 'load ' + args })
+        communication.broadcast(hosts, 'load-simulation', { 'command': 'run'})
+    
+    # Get stats
     def do_stats(self, args):
         stats = communication.broadcast(hosts, 'get-stats', { })
         min_time = stats[0]['tsx'][settings.N-1][0]
@@ -48,12 +62,15 @@ class RouterShell(cmd.Cmd):
         trx = 0
         res2 = []
         for stat in stats:
-            print(stat['id'])
-            print(stat['tsx'][settings.N-1],stat['blc'][-1])
-            print(len(stat['tsx'][settings.N-1:]),len(stat['vtsx'][settings.N-1:]),stat['ptsx'])
-            print(stat['blc'][-1][0] - stat['tsx'][settings.N-1][0])
+            print('Node', stat['id'])
+            print('Total transactions received: ', len(stat['tsx'][settings.N-1:]))
+            print('Total valid transactions: ', len(stat['vtsx'][settings.N-1:]))
+            print('Total transactions issued: ', stat['ptsx'])
 
-            res2.append(sum([x for x,_,_ in stat['mblc']]) / len(stat['mblc']))            
+            if len(stat['mblc']) == 0:
+                res2.append('NaN')
+            else:
+                res2.append(sum([x for x,_,_ in stat['mblc']]) / len(stat['mblc']))            
 
             trx += stat['ptsx']
             if stat['tsx'][settings.N-1][0] < min_time:
@@ -63,8 +80,8 @@ class RouterShell(cmd.Cmd):
         
         res = trx / (max_time - min_time)
 
-        print('The result for throuhput is: {}'.format(res))
-        print('The result for block is: {}'.format(res2))
+        print('Transaction throughput: {}'.format(res))
+        print('Block time for each node: {}'.format(res2))
 
     
 if __name__ == '__main__':

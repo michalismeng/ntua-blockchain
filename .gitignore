@@ -3,3 +3,6 @@ scripts
 kodikoi
 README.txt
 *.sh
+results
+.vscode
+*pdf

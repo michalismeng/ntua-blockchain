@@ -92,7 +92,7 @@ def get_data():
 
     return jsonify(response)
 
-@app.route('/load-senario', methods=['POST'])
+@app.route('/load-simulation', methods=['POST'])
 def load_senario():
     global commands_script
     command = jp.decode(request.data)['command']
@@ -108,8 +108,7 @@ def load_senario():
             settings.pure_transactions = len(commands_script)
     if command.startswith('run'):
         commandS.on_next('special')
-    if command.startswith('mining'):
-        return jsonify(n.miner.running)
+    
     return jsonify('OK')
 
 @app.route('/execute-command', methods=['POST'])
@@ -130,11 +129,13 @@ def management_endpoint():
     command = jp.decode(request.data)['command']
     n = current_node()
     if command.startswith('hosts'):
-        return jsonify(current_node().get_hosts())
+        return jsonify(n.get_hosts())
     elif command.startswith('echo-id'):
-        return jsonify((current_node().id))
+        return jsonify((n.id, n.ring[n.id][0], n.ring[n.id][1]))
     elif command.startswith('balance'):
-        return jsonify((n.id, n.get_node_balance(int(n.id))))
+        return jsonify((n.id, [(id, n.get_node_balance(id)) for id in range(settings.N)]))
+    elif command.startswith('mining'):
+        return jsonify(n.miner.running)
     elif command.startswith('chain'):
         response = make_response(jp.encode((n.id,n.chain.get_block_indexes()),keys=True), 200)
         response.mimetype = "text/plain"
