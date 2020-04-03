@@ -6,13 +6,13 @@ import time
 from functools import reduce
 import argparse
 import jsonpickle as jp
+import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument('boot_host', metavar='bootstrap host', type=str, help='Bootstrap ip:port pair')
 
 def broadcast(hosts, api, message):
     responses = []
-    timeouts = []
     message = jp.encode(message, keys=True)
 
     for ip, port in hosts:
@@ -20,8 +20,8 @@ def broadcast(hosts, api, message):
             response = requests.post('http://{}:{}/{}'.format(ip, port, api), message)
             responses.append(jp.decode(response.text, keys = True))
 
-        except requests.exceptions.Timeout:
-            timeouts.append((ip, port))
+        except:
+            pass
     
     return responses
 
@@ -35,11 +35,18 @@ class RouterShell(cmd.Cmd):
         self.bootstrap_host = bootstrap_host
         self.hosts = []
         self.N, self.capacity, self.difficulty = None, None, None
-        self.do_hosts(None)
-        self.do_configuration(None)
+        if(len(broadcast([self.bootstrap_host], 'management', { 'command': 'echo-id' })) == 1):
+            self.do_hosts(None)
+            self.do_configuration(None)
 
     intro = 'Welcome to noobcoin\n'
     prompt = '(client) '
+
+    def do_setall(self, args):
+        subprocess.call(["./exec_on_all.sh run_node.sh {}".format(args)],shell=True)
+    
+    def do_killall(self, args):
+        subprocess.check_call("./exec_on_all.sh kill_all.sh",   shell=True)
 
     # Old and dirty API
     def do_exec(self, args):
