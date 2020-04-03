@@ -12,7 +12,11 @@ if os.environ['env'].startswith('local'):
     else:
         N = 2
         capacity = 3
+<<<<<<< HEAD:src/settings.py
         difficulty = 4
+=======
+        difficulty = 5
+>>>>>>> e0a8e1901f8f98ba7f97f7ed0d1606086aede46b:settings.py
     print('Setting up as local environment with N={}, capacity={}, difficulty={}'.format(N, capacity, difficulty))
 elif os.environ['env'].startswith('remote'):
     if '-' not in os.environ['env']:

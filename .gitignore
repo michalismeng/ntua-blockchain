@@ -7,5 +7,9 @@ results
 new_results
 .vscode
 *pdf
+<<<<<<< HEAD
 report
 noobcash
+=======
+report
+>>>>>>> e0a8e1901f8f98ba7f97f7ed0d1606086aede46b
