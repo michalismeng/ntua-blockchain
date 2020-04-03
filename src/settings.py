@@ -10,9 +10,9 @@ if os.environ['env'].startswith('local'):
     if '-' in os.environ['env']:
         N, capacity, difficulty = [int(x) for x in os.environ['env'].split('-')[1:]]
     else:
-        N = 2
-        capacity = 3
-        difficulty = 5
+        N = 3
+        capacity = 5
+        difficulty = 4
     print('Setting up as local environment with N={}, capacity={}, difficulty={}'.format(N, capacity, difficulty))
 elif os.environ['env'].startswith('remote'):
     if '-' not in os.environ['env']:

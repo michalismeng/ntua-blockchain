@@ -10,7 +10,7 @@ class BlockChain:
     def __init__(self):
         self.chain = []             # list of blocks in the blockchain
         self.UTXO_history = []      # UTXOS for every block
-        self.common_index = 1       # marks the index until which all nodes agree on the blockchain (actually one past that index)
+        self.common_index = 1       # marks the index until which all nodes agree on the blockchain (at least from this node's point of view)
     
     def get_recent_UTXOS(self):
         return self.UTXO_history[-1]
@@ -31,9 +31,10 @@ class BlockChain:
     def chain_to_hashes(self):
         return [block.current_hash for block in self.chain]
 
+    # given the hash chains, returns the index of the maximum common prefix of all of them
     def get_global_common_index(self, all_hashes):
         return min([utils.get_max_common_prefix_length(hash_chain, self.chain_to_hashes()[self.common_index:]) for hash_chain in all_hashes])
 
     def set_max_common_index(self, index):
         self.common_index = index
-        self.UTXO_history =  [0 for _ in self.UTXO_history[:self.common_index-1]] + self.UTXO_history[self.common_index-1:]
+        self.UTXO_history =  [0 for _ in self.UTXO_history[:self.common_index-1]] + self.UTXO_history[self.common_index-1:]     # overwite with 0s -- space optimization

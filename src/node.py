@@ -26,10 +26,12 @@ class node:
         self.commands_script = []
         self.current_node_count = len(self.ring)
 
+    # get enough transaction inputs for the given amount
     def get_suffisient_UTXOS(self, ammount):
         UTXOS = self.get_node_UTXOS(self.id)
         t_ids = []
         balance = 0
+        # optimization: sort by amount to consume small UTXOs
         for id in [k for k, _ in sorted(UTXOS.items(), key=lambda item: item[1][1])]:
             if balance >= ammount:
                 break
@@ -71,17 +73,19 @@ class node:
         return [(ip, port) for ind, (ip, port, _, _) in enumerate(self.ring) if ind != self.id]
 
     def address_to_host(self, address):
-        match = [(ip, port)
-                 for ip, port, pkey, _ in self.ring if pkey == address]
+        match = [(ip, port) for ip, port, pkey, _ in self.ring if pkey == address]
         if len(match) > 0:
             return match[0]
         return 0
 
     def address_to_id(self, address):
-        match = [id for id, (_, _, pkey, _) in enumerate(
-            self.ring) if pkey == address]
-        return match[0]
+        match = [id for id, (_, _, pkey, _) in enumerate(self.ring) if pkey == address]
+        if len(match) > 0:
+            return match[0]
+        return -1
 
+    # validate a transaction given a list of UTXOS
+    # returns a new set of UTXOS where the appropriate transactions are removed 
     def validate_transaction(self, t, UTXOS, verbose=False):
         current_balance = 0
         if(t.receiver_address == t.sender_address):
@@ -117,6 +121,8 @@ class node:
 
         return UTXOS
 
+    # validate multiple transations using an initial set of utxos (utxos are not altered)
+    # returns a list of valid transactions (or None on failure) and a list of the new UTXOs
     def validate_transactions(self, ts, initial_utxos):
         temp_utxos = deepcopy(initial_utxos)
         valid_transactions = []
@@ -129,13 +135,12 @@ class node:
 
         return valid_transactions, temp_utxos
 
+    # validate a block
     def validate_block(self, new_block, UTXOS):
         valid_transactions, new_utxos = self.validate_transactions(new_block.transactions, UTXOS)
         success = len(valid_transactions) == len(new_block.transactions)
 
-        # if all transactions of the block are valid => update utxos
-        # else failure
-
+        # if all transactions of the block are valid => success
         if success:
             return new_utxos
         else:
@@ -151,8 +156,8 @@ class node:
         b.transactions = self.current_block[:settings.capacity]
         return b
 
+    # verify chain hashes
     def verify_chain(self, blocks, index):
-        # temp_blocks = zip([last_block] + blocks[:-1], blocks)
         temp_blocks = [self.chain.chain[index - 1]] + blocks
 
         for i in range(len(temp_blocks) - 1):
@@ -161,6 +166,7 @@ class node:
 
         return True
 
+    # validate a chain of blocks
     def validate_chain(self, blocks, index): 
         hash_blocks = [b.current_hash for b in blocks]
         hash_my_blocks = [b.current_hash for b in self.chain.chain[index:]]

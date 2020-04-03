@@ -12,11 +12,17 @@ import utils
 import threading
 import time
 
-# we define one common thread pool with one available thread to be used by all pipelines
-# this way they all run on the same thread => they are serialized and no concurrency control is required
+# we define one common thread pool with one available thread to be used by all blockchain pipelines
+# this way all pipelines run on the same thread => they are serialized and no concurrency control is required
 blockchain_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
-cli_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
+
+# we also define such a thread pool for the miner
 miner_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
+
+# and one for the external commands
+cli_thread_pool = rx.scheduler.ThreadPoolScheduler(1)
+
+# hacky global timestamp
 block_mining_time_stamp = 0
 
 def set_block_mining_time_stamp():
@@ -27,20 +33,7 @@ def set_block_mining_time_stamp():
 #   MAIN PROGRAM PIPELINES
 #
 
-'''
-Damn ye! Let Neptune strike ye dead Winslow! HAAARK!
-Hark Triton, hark! Bellow, bid our father the Sea King rise from the depths full foul in his fury!
-Black waves teeming with salt foam to smother this young mouth with pungent slime, to choke ye, 
-engorging your organs til' ye turn blue and bloated with bilge and brine and can scream no more - only when he,
-crowned in cockle shells with slitherin' tentacle tail and steaming beard take up his fell be-finned arm,
-his coral-tine trident screeches banshee-like in the tempest and plunges right through yer gullet,
-bursting ye - a bulging bladder no more, but a blasted bloody film now and nothing for the harpies 
-and the souls of dead sailors to peck and claw and feed upon only to be lapped up 
-and swallowed by the infinite waters of the Dread Emperor himself - forgotten to any man, to any time,
-forgotten to any god or devil, forgotten even to the sea, for any stuff for part of Winslow,
-even any scantling of your soul is Winslow no more, but is now itself the sea!
-'''
-
+# control miner execution
 def miner_operator():
     return rx.pipe(
         ops.filter(lambda o: len(o['node'].current_block) >= settings.capacity and not(o['node'].miner.running)),
@@ -49,29 +42,39 @@ def miner_operator():
         ops.do_action(lambda o: minerS.on_next(0))
     )
 
-minerS
 rx.combine_latest(
     nodeS,
     minerS
 ).pipe(
+    # use miner thread
     ops.observe_on(miner_thread_pool),
     # ops.do_action(lambda o: print(threading.currentThread().name)),
 
     ops.do_action(lambda o: print('Entering miner')),
     ops.map(lambda nc: {'node': nc[0]}),
+
+    # get 'capacity' transaction from transaction pool
     ops.map(lambda o: {'node':o['node'], 'block':o['node'].look_for_ore_block()}),
     ops.do_action(lambda o: set_block_mining_time_stamp()),
     ops.do_action(lambda o: print('Har Har Har found the ore')),
+
+    # mine the block
     ops.do_action(lambda o: o['node'].miner.mine(o['block'],o['node'].id)),
+
     ops.do_action(lambda o: print('I see something in me rock')),
+
+    # stop the pipeline if the nonce is not good (aka the miner was interrupted)
     ops.filter(lambda o: o['block'].is_block_gold()),
     ops.do_action(lambda o: print('It is GOLD I tell ya')),
+
+    # if the nonce found is OK, emit the block
     ops.do_action(lambda o: myblcS.on_next(o['block'])),    
     ops.do_action(lambda o: print('Ya\'ll got me gold!')),
 ).subscribe()
 
 # node pipeline - the first to be executed
 nodeS.pipe(
+    # use blockchain thread as every other pipeline
     ops.observe_on(blockchain_thread_pool),
 
     ops.do_action(lambda miner: print("Created miner with id: ", miner.id))
@@ -85,6 +88,7 @@ rx.combine_latest(
     ops.observe_on(blockchain_thread_pool),
     ops.map(lambda nc: {'boot_node': nc[0], 'count': nc[1]}),
 
+    # broadcast the ring only when N nodes have joined the network
     ops.filter(lambda o: o['count'] == settings.N - 1),
     ops.do_action(lambda o: do_broadcast_ring(o['boot_node']))
 ).subscribe()
@@ -97,6 +101,7 @@ rx.zip(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
 
+    # Set the node's ring upon receiving one
     ops.do_action(lambda x: x[0].set_ring(x[1])),
     ops.do_action(lambda x: print('Current ring: ', x[0].get_hosts())),
 ).subscribe()
@@ -111,6 +116,8 @@ rx.combine_latest(
 
     # run pipeline for bootstrap node only
     ops.filter(lambda ng: ng[0].id == 0),
+
+    # when the genesis block is received, the bootstrap node must execute the initialization transactions
     ops.do_action(lambda ng: do_bootstrap_transactions(ng[0]))
 ).subscribe()
 
@@ -123,8 +130,10 @@ rx.combine_latest(
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nb: {'node': nb[0], 'bl': nb[1]}),
+
     # check if this is a genesis block
     ops.filter(lambda o: o['bl'].previous_hash == 1),
+
     # check that this is the first (and only) genesis block to arrive
     ops.filter(lambda o: o['node'].chain.in_genesis_state()),
     ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'tsx': o['bl'].transactions[0]}),
@@ -136,7 +145,7 @@ rx.combine_latest(
 
     ops.do_action(lambda o: print('Added genesis block to blockchain')),
 
-    # notify genesis is ready and allow transactions to happen
+    # notify genesis block is received and allow transactions to happen
     ops.do_action(lambda o: genesisS.on_next(0))
 ).subscribe()
 
@@ -153,22 +162,32 @@ rx.combine_latest(
     # check that this is not a genesis block
     ops.filter(lambda o: o['bl'].previous_hash != 1),
 
+    # verify block signature -- this may lead to consensus being called
     ops.filter(lambda o: o['bl'].verify_block(o['node'].chain.get_last_block())),
+
+    # validate block transactions
     ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'utxos': o['node'].validate_block(o['bl'],o['node'].chain.get_recent_UTXOS())}),
     ops.filter(lambda o: o['utxos'] != None),
 
+    # kill miner since a valid block just arrived
     ops.do_action(lambda o: o['node'].miner.terminate()),
     
+    # add block to the blockchain and update the curent state
     ops.do_action(lambda o: o['node'].chain.add_block(o['bl'],o['utxos'])),
     ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'new_state':o['node'].validate_transactions(o['node'].current_block, o['node'].chain.get_recent_UTXOS())}),
     ops.do_action(lambda o: o['node'].set_current_block(o['new_state'][0])),
     ops.do_action(lambda o: o['node'].set_all_utxos(o['new_state'][1])),
+
     ops.do_action(lambda o: print('Received block: ', o['bl'].stringify())),
+
+    # keep timestamp of block validation
     ops.do_action(lambda o: settings.block_validation_time_stamps.append((time.time(),o['bl'].index,o['bl'].current_hash))),
+
+    # activate miner if needed
     miner_operator()
 ).subscribe()
 
-# pipeline for my block
+# pipeline for my block -- execution is the same as for a normal block. This pipeline is used for blocks generated by this node
 rx.combine_latest(
     nodeS,
     myblcS,
@@ -178,27 +197,33 @@ rx.combine_latest(
 
     ops.map(lambda nl: {'node': nl[0], 'bl': nl[1]}),
 
+    # verify - validate - update state as before        # TODO: Refactor and use rxpy operators
     ops.filter(lambda o: o['bl'].verify_block(o['node'].chain.get_last_block())),
-    ops.do_action(lambda o: print('Verified block: ', o['bl'].stringify())),
-
     ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'utxos': o['node'].validate_block(o['bl'],o['node'].chain.get_recent_UTXOS())}),
     ops.filter(lambda o: o['utxos'] != None),
-    ops.do_action(lambda o: print('Validated block: ', o['bl'].stringify())),
 
-    
     ops.do_action(lambda o: o['node'].chain.add_block(o['bl'],o['utxos'])),
     ops.map(lambda o: {'node': o['node'], 'bl': o['bl'], 'new_state':o['node'].validate_transactions(o['node'].current_block, o['node'].chain.get_recent_UTXOS())}),
     ops.do_action(lambda o: o['node'].set_current_block(o['new_state'][0])),
     ops.do_action(lambda o: o['node'].set_all_utxos(o['new_state'][1])),
+
     ops.do_action(lambda o: print('Received block: ', o['bl'].stringify())),
+
+    # keep timestamps
     ops.do_action(lambda o: settings.block_validation_time_stamps.append((time.time(),o['bl'].index,o['bl'].current_hash))),
     ops.do_action(lambda o: settings.block_mining_time_stamps.append((time.time() - block_mining_time_stamp,o['bl'].index,o['bl'].current_hash))),
+
+    # kill miner
     ops.do_action(lambda o: o['node'].miner.terminate()),
+
+    # notify every one -- this is not a blocking call
     ops.do_action(lambda o: broadcastS.on_next((o['node'].get_other_hosts(),'add-block', { 'block': o['bl'] }))),
+
+    # restart miner with a new set of transactions if needed
     miner_operator()
 ).subscribe()
 
-# pipeline for transactions
+# pipeline for transactions - does not emit until genesis has arrived
 rx.combine_latest(
     nodeS,
     genesisS,
@@ -206,24 +231,31 @@ rx.combine_latest(
 ).pipe(
     ops.observe_on(blockchain_thread_pool),
     ops.do_action(lambda _: check_correct_running_thread()),
+
     ops.map(lambda nl: {'node': nl[0], 'tx': nl[2], 'utxos': nl[0].get_all_UTXOS()}),
+
+    # keep timestamp for experiments
     ops.do_action(lambda o: settings.transaction_time_stamps.append((time.time(),o['tx'].transaction_id))),
 
-    # verify transaction signature then calculate new utxos. If valid (not None) then update node utxos 
+    # verify transaction signature
     ops.filter(lambda o: o['tx'].verify_transaction()),
 
+    # validate transaction based on the current set of utxos
     ops.map(lambda o: {'node': o['node'], 'tx': o['tx'], 'new_utxos': o['node'].validate_transaction(o['tx'], o['utxos'], True)}),
     ops.filter(lambda o: o['new_utxos'] != None),
 
+    # if the transaction is valid, update the current state
     ops.do_action(lambda o: o['node'].set_all_utxos(o['new_utxos'])),
     ops.do_action(lambda o: o['node'].add_transaction_to_block(o['tx'])),
 
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
     ops.do_action(lambda o: settings.v_transactions.append((time.time(),o['tx'].transaction_id))),
+
+    # restart the miner if necessary
     miner_operator()
 ).subscribe()
 
-# pipeline for my transactions
+# pipeline for my transactions -- execution is the same as for a normal transaction. This pipeline is used for transactions generated by this node
 rx.combine_latest(
     nodeS,
     mytsxS
@@ -232,11 +264,14 @@ rx.combine_latest(
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nl: {'node': nl[0], 'target': nl[1][0], 'amount': nl[1][1]}),
+
+    # create transaction
     ops.map(lambda o: {'node': o['node'], 'tx': create_transaction(o['node'],o['target'],o['amount']), 'utxos': o['node'].get_all_UTXOS()}),
 
+    # keep timestamp for experiments
     ops.do_action(lambda o: settings.transaction_time_stamps.append((time.time(),o['tx'].transaction_id))),
 
-    # verify transaction signature then calculate new utxos. If valid (not None) then update node utxos 
+    # verify - validate - update as before (only validation is required to update utxos) # TODO: refactor with rxpy operators
     ops.filter(lambda o: o['tx'].verify_transaction()),
 
     ops.map(lambda o: {'node': o['node'], 'tx': o['tx'], 'new_utxos': o['node'].validate_transaction(o['tx'], o['utxos'], True)}),
@@ -247,11 +282,16 @@ rx.combine_latest(
 
     ops.do_action(lambda o: print('Received transaction: ', o['tx'].stringify(o['node']))),
     ops.do_action(lambda o: settings.v_transactions.append((time.time(),o['tx'].transaction_id))),
+
+    # notify every one -- this is not a blocking call
     ops.do_action(lambda o: broadcastS.on_next((o['node'].get_other_hosts(), 'add-transaction', { 'transaction': o['tx'] }))),
 
     miner_operator()
 ).subscribe()
 
+# utility functions not yet refactored
+
+# called when a valid blockchain wsa found and we need to update our current blockchain
 def consesus_succedeed(node, branch_index, utxo_history, chain, transactions):
     new_chain = node.chain.chain[:branch_index] + chain[-len(utxo_history):]
     new_utxos = node.chain.UTXO_history[:branch_index] +  utxo_history
@@ -263,10 +303,13 @@ def consesus_succedeed(node, branch_index, utxo_history, chain, transactions):
 
     my_transactions.extend(node.current_block)
 
+    # these transactions belonged to our old blockchain, so we should try and add them to our transaction pool
     transactions_to_add = [t for t in my_transactions if t.transaction_id not in transactions]
 
+    # validate each transaction and keep only the ones that conform to the new blockchain
     valid_transactions, ring_utxos = node.validate_transactions(transactions_to_add, new_utxos[-1])
 
+    # update the state
     node.set_current_block(valid_transactions)
     node.set_all_utxos(ring_utxos)
     
@@ -312,15 +355,18 @@ rx.combine_latest(
     nodeS,
     consensusS
 ).pipe(
+    # this subscription is called immediately when called -- this is a blocking call
     ops.observe_on(rx.scheduler.ImmediateScheduler()),
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nl: {'node': nl[0]}),
 
+    # kill miner for this operation
     ops.do_action(lambda o: o['node'].miner.terminate()),
 
-    # # request blockchain hashes from all nodes, after a certrain point in the blockchain (common_index) at which all nodes agree
+    # request blockchain hashes from all nodes, after a certrain point in the blockchain (common_index) at which all nodes agree
     ops.map(lambda o: {'node': o['node'], 'results': broadcast(o['node'].get_other_hosts(), 'request-chain-hash', {'index': o['node'].chain.common_index })}),
+
     ops.do_action(lambda o: do_consensus(o['node'], o['results'])),
 
     miner_operator()
@@ -330,18 +376,22 @@ rx.combine_latest(
     nodeS,
     consensusSucceededS
 ).pipe(
+    # this subscription is called immediately when called -- this is a blocking call
     ops.observe_on(rx.scheduler.ImmediateScheduler()),
     ops.do_action(lambda _: check_correct_running_thread()),
 
     ops.map(lambda nc: {'node': nc[0], 'branch_index': nc[1][0], 'utxo_history': nc[1][1], 'block_chain': nc[1][2], 'transactions': nc[1][3], 'ids_hashes': nc[1][4] }),
+    
     ops.do_action(lambda o: consesus_succedeed(o['node'], o['branch_index'], o['utxo_history'], o['block_chain'], o['transactions'])),
+
+    # update the global common index
     ops.do_action(lambda o: o['node'].chain.set_max_common_index(
         o['node'].chain.common_index + o['node'].chain.get_global_common_index([c for c in [h['hashes'] for h in o['ids_hashes']]]))),
     ops.do_action(lambda o: print('new max common index: ', o['node'].chain.common_index))
 ).subscribe()
 
 #
-#   CLI PIPELINES
+#   CLI PIPELINE
 #
 
 rx.combine_latest(
@@ -351,6 +401,10 @@ rx.combine_latest(
     ops.observe_on(cli_thread_pool),
     ops.do_action(lambda x: execute(x[0], x[1]))
 ).subscribe()
+
+#
+#   COMMUNICATION PIPELINE
+#
 
 broadcastS.pipe(
     ops.observe_on(rx.scheduler.NewThreadScheduler()),

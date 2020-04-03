@@ -11,7 +11,7 @@ class Miner:
     def set_running(self):
         self.running = True
 
-    def mine(self,block,id):
+    def mine(self, block, id):
         nonce = (randint(0, 4294967295) * id) % 4294967295
         block.seal_block(nonce)
 

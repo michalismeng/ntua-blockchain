@@ -9,9 +9,12 @@ from miner import Miner
 
 
 def execute(n, s):
+    # execute the loaded simulation script
     if s == 'special':
         for com in n.commands_script:
             mytsxS.on_next(com)
+
+    # all these commands belong to the old api -- do not use
     elif s == 'exit':
         os._exit(0)
     elif s == 'utxos':

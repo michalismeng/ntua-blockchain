@@ -20,14 +20,15 @@ import os
 from blockchain_subjects import mytsxS
 import cli
 
-# uncomment to disable FLASK messages
+# disable FLASK messages
 import logging
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 from blockchain_subjects import nodeS, node_countS, blcS, tsxS, ringS, commandS
-import subscriptions        # import to execute them
+import subscriptions        # if not imported then subscriptions are never executed
 
+# used for simulation scripts
 commands_script = []
 command_index = 0
 
@@ -36,25 +37,32 @@ def create_global_variable(name, value):
     if name not in globals():
         globals()[name] = value
     
+# Flask endpoints
 
+# Backbone endpoints
+
+# Received ring (only once!)
 @app.route('/get-ring', methods=['POST'])
 def update_ring():
     args = jp.decode(request.data)
     ringS.on_next(args['ring'])
     return jsonify('OK')
 
+# Received transaction
 @app.route('/add-transaction', methods=['POST'])
 def add_transaction():
     args = jp.decode(request.data)
     tsxS.on_next(args['transaction'])
     return jsonify('OK')
 
+# Received block
 @app.route('/add-block', methods=['POST'])
 def add_block():
     args = jp.decode(request.data)
     blcS.on_next(args['block'])
     return jsonify('OK')
 
+# someone requested my chain of hashes
 @app.route('/request-chain-hash', methods=['POST'])
 def request_chain_hash():
     args = jp.decode(request.data)
@@ -64,6 +72,7 @@ def request_chain_hash():
     print('Hash chain sent')
     return jsonify(result)
 
+# someone request my blocks
 @app.route('/request-chain', methods=['POST'])
 def request_chain():
     args = jp.decode(request.data)
@@ -73,6 +82,7 @@ def request_chain():
     print('Chain sent')
     return response
 
+# a new node has joined the network
 @app.route('/enter-ring', methods=['POST'])
 def get_data():
     create_global_variable('node_count', 1) # initialize to 1 since the bootstrap node is already registered
@@ -92,6 +102,11 @@ def get_data():
 
     return jsonify(response)
 
+######################################################################################
+
+# Management endpoints
+
+# simulation endpoint
 @app.route('/load-simulation', methods=['POST'])
 def load_senario():
     global commands_script
@@ -111,18 +126,7 @@ def load_senario():
     
     return jsonify('OK')
 
-@app.route('/execute-command', methods=['POST'])
-def execute_command():
-    global commands_script, command_index
-    command = jp.decode(request.data)['command']
-    if command.startswith('exec'):
-        args = command.split()[1:]
-        ids = args[0].split(',')
-        if 'id{}'.format(current_node().id) in ids:
-            cli.execute(current_node(), ' '.join(args[1:]))
-
-    return jsonify('OK')
-
+# management endpoint
 @app.route('/management', methods=['POST'])
 def management_endpoint():
     global commands_script, command_index
@@ -148,6 +152,7 @@ def management_endpoint():
         return response
     return jsonify('OK')
 
+# stats endpoint
 @app.route('/get-stats', methods=['POST'])
 def get_stat():
     n = current_node()
@@ -160,6 +165,22 @@ def get_stat():
     response = make_response(jp.encode(stats), 200)
     response.mimetype = "text/plain"
     return response
+
+# deprecated
+# execute a command using the old api -- this call is blocking
+@app.route('/execute-command', methods=['POST'])
+def execute_command():
+    global commands_script, command_index
+    command = jp.decode(request.data)['command']
+    if command.startswith('exec'):
+        args = command.split()[1:]
+        ids = args[0].split(',')
+        if 'id{}'.format(current_node().id) in ids:
+            cli.execute(current_node(), ' '.join(args[1:]))
+
+    return jsonify('OK')
+
+##########################################################
 
 # bootstrap node
 if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
@@ -174,7 +195,7 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
 
     bootstrap_node = utils.create_bootstrap_node()
     nodeS.on_next(bootstrap_node)
-    utils.startThreadedServer(app, bootstrap_ip, bootstrap_port)
+    utils.startServer(app, bootstrap_ip, bootstrap_port)
 
 # non-bootstrap nodes
 else:
@@ -191,4 +212,4 @@ else:
 
     miner_node = utils.create_node(ip, port)
     nodeS.on_next(miner_node)
-    utils.startThreadedServer(app, ip, port)
+    utils.startServer(app, ip, port)

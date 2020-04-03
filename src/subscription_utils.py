@@ -13,6 +13,7 @@ def check_correct_running_thread():
     #     print('terminating...')
     #     os._exit(0)
     pass
+
 # execute first N - 1 transactions to all node except the bootstrap node
 def do_bootstrap_transactions(bootstrap_node):
     for _, _, public_key, _ in bootstrap_node.ring[1:]:     # exclude self
@@ -24,10 +25,12 @@ def create_transaction(sender_node, target_key, amount):
     t.sign_transaction(sender_node.wallet.private_key)
     return t
 
+# broadcast genesis block
 def do_genesis_block(bootstrap_node):
     gen_block = block.Block.genesis(bootstrap_node.wallet.address)
     broadcastS.on_next((bootstrap_node.get_hosts(), 'add-block', { 'block': gen_block }))
 
+# broadcast normal block
 def do_block(sender_node, block):
     broadcastS.on_next((sender_node.get_other_hosts(), 'add-block', { 'block': block }))
 

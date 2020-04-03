@@ -33,13 +33,13 @@ class Block:
 		hashString = jp.encode((self.index,self.timestamp,[t.transaction_id for t in self.transactions],self.nonce,self.previous_hash))
 		return SHA.new(hashString.encode())
 
-	# transaction and block capacity must have already been validated
 	def add_transaction(self, transaction):
 		self.transactions.append(transaction)
 	
 	def transaction_ids(self):
 		return [transaction.transaction_id for transaction in self.transactions]
 
+	# verify a block and request consensus if needed
 	def verify_block(self, last_block, consensus_mode = False):
 		if str(self.__myHash__().hexdigest()) != self.current_hash:
 			return False
@@ -50,12 +50,11 @@ class Block:
 		if self.previous_hash == last_block.current_hash and self.index == last_block.index + 1:
 			return True
 
-		print('Invalid block.')
-		print(self.stringify())
 		if self.index > last_block.index and not(consensus_mode):
 			print('Consensus is needed.')
 			consensusS.on_next(0)
 
+		print('Invalid block.')
 		return False
 
 	def set_nonce(self, nonce):
