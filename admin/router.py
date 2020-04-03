@@ -70,7 +70,7 @@ class RouterShell(cmd.Cmd):
         for id, ip, port in nodes:
             print('Node {} is alive at {}:{}'.format(id, ip, port))
 
-        if len(nodes) == len(self.N):
+        if len(nodes) == self.N:
             print('All nodes are alive')
         else:
             print('Warning! Some nodes did not respond')
