@@ -137,7 +137,7 @@ def management_endpoint():
     elif command.startswith('config'):
         return jsonify((settings.N, settings.capacity, settings.difficulty))
     elif command.startswith('echo-id'):
-        return jsonify((n.id, n.ring[n.id][0], n.ring[n.id][1]))
+        return jsonify((n.id, n.ip, n.port))
     elif command.startswith('balance'):
         return jsonify((n.id, [(id, n.get_node_balance(id)) for id in range(settings.N)]))
     elif command.startswith('mining'):

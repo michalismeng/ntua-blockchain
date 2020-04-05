@@ -20,11 +20,7 @@ def create_node(ip, port):
     public_key = node_wallet.address
     message = { 'ip': ip, 'port': port, 'public_key': public_key }
 
-    print('here')
-
     response = communication.unicast_bootstrap("enter-ring", message)
-    print('here')
-
     myid = response["id"]
     return node.node(myid, ip, port, node_wallet)
 

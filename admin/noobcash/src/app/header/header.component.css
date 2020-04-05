@@ -1,0 +1,22 @@
+a {
+    text-decoration: none;
+    color: white;
+}
+
+a:hover, a:active {
+    color: lightgray;
+}
+
+.navigation-items {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+mat-toolbar {
+    height: 56px;
+}
+
+li > a {
+    font-size: 16px; 
+}

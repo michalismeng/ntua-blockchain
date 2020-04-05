@@ -1,0 +1,19 @@
+footer {
+    margin-left: 2%;
+    width: 98%;
+}
+
+mat-icon {
+    transform: scale(1.2);
+    vertical-align: middle;
+}
+
+
+a:link, a:visited {
+    color: black;
+    text-decoration: none;
+}
+
+:host {
+    height: 35px;
+}

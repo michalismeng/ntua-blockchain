@@ -10,7 +10,7 @@ if os.environ['env'].startswith('local'):
     if '-' in os.environ['env']:
         N, capacity, difficulty = [int(x) for x in os.environ['env'].split('-')[1:]]
     else:
-        N = 3
+        N = 2
         capacity = 5
         difficulty = 4
     print('Setting up as local environment with N={}, capacity={}, difficulty={}'.format(N, capacity, difficulty))
