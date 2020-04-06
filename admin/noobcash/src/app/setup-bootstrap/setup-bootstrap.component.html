@@ -1,0 +1,62 @@
+
+<mat-card class='mat-elevation-z8'>
+    <mat-card-header>
+        <mat-card-title>System Configuration Parameters</mat-card-title>
+        <mat-card-subtitle>System Parameters</mat-card-subtitle>
+    </mat-card-header>
+
+    <form [formGroup]='form' (ngSubmit)='submit()'>
+        <mat-card-content>
+
+            <div fxFlex fxLayout='column'>
+                <div fxFlex fxLayout="row" fxLayoutAlign="start center" fxLayoutGap="40px">
+
+                        <mat-form-field>
+                            <mat-label>Number of nodes</mat-label>
+                            <input type="number" id='N' matInput formControlName="N" step='5' max='50' min='5'>
+                        </mat-form-field>
+                
+                    <mat-form-field>
+                        <mat-label>Block capacity</mat-label>
+                        <input type="text" matInput formControlName="capacity">
+                    </mat-form-field>
+                
+                    <mat-form-field>
+                        <mat-label>Difficulty of mining</mat-label>
+                        <input type="text" matInput formControlName="difficulty">
+                    </mat-form-field>
+                </div>
+
+                <div *ngIf='N.invalid && (N.dirty || N.touched)' class="alert">
+                    <div *ngIf="N.errors.required">
+                        *Number of nodes is required.
+                    </div>
+
+                    <div *ngIf="N.errors.forbiddenMultiple">
+                        *Number of nodes must be a multiple of five.
+                    </div>
+                </div>
+
+                <div *ngIf='capacity.invalid && (capacity.dirty || capacity.touched)' class="alert">
+                    <div *ngIf="capacity.errors.required">
+                        *Block capacity is required.
+                    </div>
+                </div>
+
+                <div *ngIf='difficulty.invalid && (difficulty.dirty || difficulty.touched)' class="alert">
+                    <div *ngIf="difficulty.errors.required">
+                        *Mining difficulty is required.
+                    </div>
+                </div>
+            </div>
+
+        
+        </mat-card-content>
+
+        <mat-card-actions style='margin-bottom: 0px;'>
+            <button mat-raised-button type="submit" [disabled]="!form.valid" color="primary" style='width: 100%;'>Start Noobcash</button>
+        </mat-card-actions>
+    </form>
+</mat-card>
+
+<div *ngIf='isLoading'><mat-spinner></mat-spinner></div>

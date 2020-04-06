@@ -1,0 +1,13 @@
+<mat-toolbar color="primary">
+    <div fxFlex fxLayout="row" fxLayoutGap="20px" fxLayoutAlign="start center">
+        NoobCash
+    </div>
+    <div class='mat-body' style='margin: auto' *ngIf='config$ | async as config'>
+        Configuration ( {{ config.N }} nodes, {{ config.capacity }} capacity, {{ config.difficulty }} difficulty )
+    </div>
+
+    <div fxFlex fxLayout='column' fxLayoutAlign='center end' style='margin-left: auto;'>
+        <div class='mat-body' *ngIf='bootstrap$ | async as bootstrap'>Current bootstrap @ {{bootstrap.ip}}:{{bootstrap.port}}</div>
+    </div>
+</mat-toolbar>
+  

@@ -1,0 +1,40 @@
+<div fxFlex fxLayout="column" class='no-select'>
+    <!-- <mat-divider></mat-divider> -->
+    <footer fxFlex fxLayoutAlign="start center" class='no-select'>
+
+        <div class='mat-body'>Noobcash 2020</div>
+        
+        <div class='mat-small' style="margin-left: 15px;">
+            Made with <i class="fas fa-heart" style="color: #FB4E2D"></i> by 
+            <a target="_blank" href="https://github.com/megis7">
+                <b>megis7</b>
+            </a>
+            and 
+            <a target="_blank" href="https://github.com/panoszogas">
+                <b>panoszogas</b>
+            </a>
+        </div>
+
+        <div *ngIf='systemOrdinal == -1'  class='alert-failure mat-body-strong' style='margin-left: auto; width: 250px;  padding: 0px 10px; height: 100%'>
+            <div fxFlex fxLayoutAlign='center center'>
+                <mat-icon style='transform: scale(0.9); margin-right: 8px'>cloud_off</mat-icon>
+                Noobcash is down
+            </div>
+        </div>
+
+        <div *ngIf='systemOrdinal == 1'  class='alert-warn mat-body-strong' style='margin-left: auto; width: 250px;  padding: 0px 10px; height: 100%'>
+            <div fxFlex fxLayoutAlign='center center'>
+                <mat-icon style='transform: scale(0.9); margin-right: 8px'>leak_add</mat-icon>
+                Waiting for quorum ...
+            </div>
+        </div>
+
+
+        <div *ngIf='systemOrdinal == 3'  class='alert-success mat-body-strong' style='margin-left: auto; width: 250px;  padding: 0px 10px; height: 100%'>
+            <div fxFlex fxLayoutAlign='center center'>
+                <mat-icon style='transform: scale(0.9); margin-right: 8px'>cloud_done</mat-icon>
+                Noobcash is up
+            </div>
+        </div>
+    </footer>
+</div>

@@ -26,6 +26,9 @@ export enum NodeActionTypes {
     GetAllBalance = '[Node] Get All Balance',
     GetAllBalanceSuccess = '[Node] Get All Balance Success',
 
+    GetAllMining = '[Node] Get All Mining',
+    GetAllMiningSuccess = '[Node] Get All Mining Success',
+
 }
 
 export class GetHosts implements Action {
@@ -124,6 +127,18 @@ export class GetAllBalanceSuccess implements Action {
 	constructor(public balances: {id: number, balances: { id: number, balance: number }[] }[]) {}
 }
 
+export class GetAllMining implements Action {
+    readonly type = NodeActionTypes.GetAllMining;
+
+	constructor(public nodes: Node[]) {}
+}
+
+export class GetAllMiningSuccess implements Action {
+    readonly type = NodeActionTypes.GetAllMiningSuccess;
+
+	constructor(public minings: { id: number, mining: boolean}[]) {}
+}
+
 export type All = 
     | GetHosts
     | GetHostsSuccess
@@ -141,4 +156,6 @@ export type All =
     | PingAllNodeSuccess
     | GetAllBalance
     | GetAllBalanceSuccess
+    | GetAllMining
+    | GetAllMiningSuccess
     ;

@@ -1,0 +1,30 @@
+<div fxFlex fxLayout='column' fxLayoutGap='5px'>
+    <mat-divider></mat-divider>
+    <div fxFlex fxLayoutAlign='start center' style='padding: 0 20px'>
+        <form [formGroup]='form' (ngSubmit)='submit()' fxFlex fxLayoutAlign='start center'>
+
+            
+            <div fxFlex fxLayout="row" fxLayoutAlign='start center' fxLayoutGap="40px">
+                <p class='mat-h2'>Create Transaction: </p>
+                <mat-form-field>
+                    <mat-label>Source ID</mat-label>
+                    <input type="number" matInput formControlName="sourceNode">
+                </mat-form-field>
+        
+                <mat-form-field>
+                    <mat-label>Target ID</mat-label>
+                    <input type="number" matInput formControlName="targetNode">
+                </mat-form-field>
+        
+                <mat-form-field>
+                    <mat-label>Amount</mat-label>
+                    <input type="number" matInput formControlName="amount">
+                </mat-form-field>
+                <button mat-raised-button color='primary' type='submit' [disabled]='!form.valid'>Send</button>
+            </div>
+        
+        </form>
+
+        <button mat-raised-button color='warn' (click)='killall()' style='margin-left: auto'>Kill Noobcash</button>
+    </div>
+</div>

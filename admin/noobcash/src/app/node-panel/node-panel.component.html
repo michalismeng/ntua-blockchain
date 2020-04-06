@@ -1,0 +1,34 @@
+
+
+<mat-card class='mat-elevation-z8 no-select'>
+    <mat-card-header>
+        <mat-card-title>
+            <div fxFlex fxLayout='column' fxLayoutAlign='start center'>
+                <div fxFlex fxLayoutAlign='start center'>
+                    <div>Node {{node.id}}</div>
+                    <div class='mat-small' [style.color]="node.isAlive ? 'green' : 'red'" style='margin-left: 5px'>{{ node.isAlive ? '(alive)' : '(dead)' }}</div>
+                </div>
+                <div>
+                    <mat-divider></mat-divider>
+                </div>
+            </div>
+            
+        </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+        <table style='text-align: left;'>
+            <tr>
+                <th style='padding-left: 24px; padding-right: 30px'>Host:</th>
+                <td style='text-align: center;'> {{node.ip}}:{{node.port}} </td>
+            </tr>
+            <tr>
+                <th><button mat-icon-button disableRipple [disabled]='!(canRefresh$ | async)' (click)='getBalance()'><mat-icon matTooltipShowDelay='300' matTooltip='Refresh balance' matTooltipPosition='above'>sync</mat-icon></button>Balance:</th>
+                <td style='text-align: center; padding-top: 10px'><span style='vertical-align: middle;'>{{ getBalanceForCurrentNode() }}</span> <span style='vertical-align: middle;' *ngIf='getBalanceForCurrentNode() != "-"'>$</span></td>
+            </tr>
+            <tr>
+                <th><button mat-icon-button disableRipple [disabled]='!(canRefresh$ | async)' (click)='getIsMining()'><mat-icon matTooltipShowDelay='300' matTooltip='Refresh mining status' matTooltipPosition='above'>sync</mat-icon></button>Mining:</th>
+                <td style='text-align: center; padding-top: 10px'> <span style='vertical-align: middle;'>{{ getMiningForCurrentNode() }}</span> </td>
+            </tr>
+        </table>
+    </mat-card-content>
+</mat-card>

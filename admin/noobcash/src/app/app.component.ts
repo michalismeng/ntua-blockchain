@@ -5,7 +5,7 @@ import { AppState } from './reducers';
 import { Observable, zip, interval, combineLatest, timer } from 'rxjs';
 import { filter, withLatestFrom, delay, tap, map } from 'rxjs/operators';
 import { SetSystemState, SetBootstrapAddress, GetConfiguration, KillSystem, KillSystemSuccess } from './actions/system.actions';
-import { GetHosts, PingNode, PingAllNodes, GetAllBalance, GetHostsSuccess } from './actions/node.actions';
+import { GetHosts, PingNode, PingAllNodes, GetAllBalance, GetHostsSuccess, GetAllMining } from './actions/node.actions';
 
 @Component({
   selector: 'app-root',
@@ -68,14 +68,17 @@ export class AppComponent {
     ).pipe(filter(([s, ns]) => s == 'semi-quorum' && ns && ns.every(n => n.isAlive))).subscribe(([_, n]) => this.store.dispatch(new SetSystemState('quorum')))
     
 
-    // when in quorum update all balances
+    // when in quorum update all balances and mining status
     combineLatest(
       timer(0, 1000),
       this.store.select(s => s.system.systemState),
     ).pipe(
       filter(([_, s]) => s == 'semi-quorum' || s == 'quorum'),
       withLatestFrom(this.store.select(s => s.nodes.nodes))
-    ).subscribe(([_, nodes]) => this.store.dispatch(new GetAllBalance(nodes)))
+    ).subscribe(([_, nodes]) => { 
+      this.store.dispatch(new GetAllBalance(nodes))
+      this.store.dispatch(new GetAllMining(nodes))
+    })
 
     this.store.select(s => s.system.systemState)
       .pipe(

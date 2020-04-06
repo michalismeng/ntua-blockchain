@@ -141,7 +141,7 @@ def management_endpoint():
     elif command.startswith('balance'):
         return jsonify((n.id, [(id, n.get_node_balance(id)) for id in range(settings.N)]))
     elif command.startswith('mining'):
-        return jsonify(n.miner.running)
+        return jsonify((n.id, n.miner.running))
     elif command.startswith('view'):
         txs = n.chain.get_last_block().transactions
         txs = [(n.address_to_id(tx.sender_address), n.address_to_id(tx.receiver_address), tx.amount) for tx in txs]

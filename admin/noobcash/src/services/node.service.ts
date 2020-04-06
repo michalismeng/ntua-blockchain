@@ -40,9 +40,9 @@ export class NodeService {
             )
     }
 
-    public getIsMining(node: Node): Observable<boolean> {
+    public getIsMining(node: Node): Observable<[number, boolean]> {
         let command = new Command([[node.ip, node.port]], 'management', 'mining')
-        return this.http.post<boolean[]>(`${this.serverUrl}/forward-command`, { payload: command })
+        return this.http.post<[number, boolean][]>(`${this.serverUrl}/forward-command`, { payload: command })
             .pipe(
                 map(res => res[0]),
             )
@@ -68,6 +68,14 @@ export class NodeService {
             .pipe(
                 map(res => res.map(r => { return { id: r[0], balances: r[1] } })),
                 map(res => res.map(r => { return { id: r.id, balances: r.balances.map(_r => { return { 'id': _r[0], 'balance': _r[1]} } ) }})),
+            )
+    }
+
+    public getAllMining(nodes: Node[]): Observable<{id: number, mining: boolean}[]> {
+        let command = new Command(nodes.map(n => [n.ip, n.port]), 'management', 'mining', true)
+        return this.http.post<[number, boolean][]>(`${this.serverUrl}/forward-command`, { payload: command })
+            .pipe(
+                map(res => res.map(m => { return { id: m[0], mining: m[1] }})),
             )
     }
 }

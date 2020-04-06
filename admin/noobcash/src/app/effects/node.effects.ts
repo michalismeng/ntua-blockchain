@@ -5,7 +5,7 @@ import { tap, map, filter } from 'rxjs/operators';
 import { Store } from '@ngrx/store';
 import { AppState } from '../reducers';
 import { NodeService } from 'src/services/node.service';
-import { NodeActionTypes, GetHostsSuccess, GetHostsFailure, PingNodeSuccess, PingNodeFailure, GetBalanceSuccess, GetBalanceFailure, GetMiningSuccess, PingAllNodeSuccess, GetAllBalanceSuccess} from '../actions/node.actions';
+import { NodeActionTypes, GetHostsSuccess, GetHostsFailure, PingNodeSuccess, PingNodeFailure, GetBalanceSuccess, GetBalanceFailure, GetMiningSuccess, PingAllNodeSuccess, GetAllBalanceSuccess, GetAllMiningSuccess} from '../actions/node.actions';
 import { Node } from 'src/models/node'; 
 import { Error } from 'src/models/error';
 
@@ -48,7 +48,7 @@ export class NodeEffect {
     ofType( NodeActionTypes.GetMining ),
     tap(a => {
       this.nodeService.getIsMining(a.node).subscribe(
-          isMining => this.store.dispatch(new GetMiningSuccess(a.node.id, isMining)),
+          ([id, mining]) => this.store.dispatch(new GetMiningSuccess(id, mining)),
           error => this.store.dispatch(new GetBalanceFailure(new Error(error.message, error.error))))
     }))
 
@@ -67,6 +67,14 @@ export class NodeEffect {
     tap(a => {
       this.nodeService.getBalances(a.nodes).subscribe(
           balances => this.store.dispatch(new GetAllBalanceSuccess(balances)))
+    }))
+
+  @Effect({ dispatch: false })
+  GetMinings: Observable<any> = this.actions$.pipe(
+    ofType( NodeActionTypes.GetAllBalance ),
+    tap(a => {
+      this.nodeService.getAllMining(a.nodes).subscribe(
+          minings => this.store.dispatch(new GetAllMiningSuccess(minings)))
     }))
 
  

@@ -1,0 +1,46 @@
+<app-layout>
+
+    <mat-sidenav-container>
+      <mat-sidenav-content fxFlex fxLayout="column">
+        
+        <app-header></app-header>
+
+        <div class='wrapper'>
+          <main>
+
+            <div *ngIf='systemState == -1' fxFlex fxLayout='column' fxLayoutAlign='center center' fxLayoutGap='10px'>
+              <app-setup-bootstrap></app-setup-bootstrap>
+            </div>
+
+            <div *ngIf='systemState > 0' style='width: 100%'>
+            
+              <app-main-panel></app-main-panel>
+
+            </div>
+
+
+
+            <div *ngIf='systemState == 0'>
+              <mat-spinner></mat-spinner>
+            </div>
+          
+          </main>
+
+        </div>
+
+        <div style='margin-top: auto'>
+          <div>
+            <div fxFlex fxLayout='row' fxLayoutAlign='start end'>
+              <app-transaction *ngIf='systemState > 0' style='width: 100%'></app-transaction>
+            </div>
+          </div>
+
+          <!-- <mat-progress-bar color='primary' mode='indeterminate'></mat-progress-bar> -->
+          
+          <app-footer class='mat-elevation-z8'></app-footer>
+        </div>
+ 
+      </mat-sidenav-content> 
+    </mat-sidenav-container>
+
+</app-layout>

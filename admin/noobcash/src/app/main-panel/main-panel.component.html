@@ -1,0 +1,13 @@
+
+
+<div fxFlex fxLayout='column'>
+
+    <mat-grid-list *ngIf='nodes && nodes.length > 0' [cols]='columns' gutterSize='0' rowHeight='200px' style='width: 100%'>
+        <mat-grid-tile *ngFor='let node of nodes'>
+            <app-node-panel [nodeID]='node.id'></app-node-panel>
+        </mat-grid-tile>
+    </mat-grid-list>
+
+    <!-- <div style='color:red'> Current error: {{ errorMessage$ | async | json }}</div> -->
+
+</div>

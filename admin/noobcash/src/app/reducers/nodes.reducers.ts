@@ -83,6 +83,17 @@ export function reducer(state = initialState, action: All) {
 
             return Object.assign({}, state, { nodes: _new_nodes, errorMessage: null });
 
+        case NodeActionTypes.GetAllMiningSuccess:
+            let __new_nodes: Node[] = JSON.parse(JSON.stringify(state.nodes))
+
+            // set mining
+            __new_nodes.forEach(n => { 
+                let b = action.minings.find(nn => nn.id == n.id)
+                n.isMining = b ? b.mining : null
+            })
+
+            return Object.assign({}, state, { nodes: __new_nodes, errorMessage: null });
+
         default: return state;
     }
 }
