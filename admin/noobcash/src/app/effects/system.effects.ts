@@ -16,11 +16,7 @@ export class SystemEffect {
   @Effect({ dispatch: false })
   KillSystem: Observable<any> = this.actions$.pipe(
     ofType( SystemActionTypes.KillSystem ),
-    tap(_ => this.configService.killAll().pipe(delay(1000))
-    .subscribe(_ => {
-      this.store.dispatch(new KillSystemSuccess())
-      this.store.dispatch(new GetHostsSuccess([]))
-    }))
+    tap(_ => this.configService.killAll().subscribe())
   )
 
   @Effect({ dispatch: false })

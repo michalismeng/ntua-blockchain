@@ -32,7 +32,8 @@ function mapStateToOrdinal(state: string) {
         case 'down': return -1;
         case 'init': return 0;
         case 'up': return 1;
-        case 'quorum': return 2;
+        case 'semi-quorum': return 2;
+        case 'quorum': return 3;
     }
     return -10;
 }
@@ -48,12 +49,8 @@ export function reducer(state = initialState, action: All) {
         case SystemActionTypes.SetSystemState:
             return Object.assign({}, state, { systemState: action.newState, systemOrdinal: mapStateToOrdinal(action.newState), errorMessage: null });
 
-        // case SystemActionTypes.SetBootstrapAddress:
-        //     let new_state = Object.assign({}, state, { ...initialState });
-        //     return Object.assign({}, state, new_state, { bootstrap: { ip: action.bootstrap_ip, port: action.bootstrap_port } })
-
         case SystemActionTypes.KillSystemSuccess:
-            return Object.assign({}, state, { ...initialState });
+            return Object.assign({}, state, { ...initialState, systemState: 'down', systemOrdinal: mapStateToOrdinal('down') });
 
         default: return state;
     }
