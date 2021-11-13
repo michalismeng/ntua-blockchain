@@ -36,13 +36,13 @@ class Transaction:
         Sign transaction with private key
         """
         self.signature = PKCS1_v1_5.new(private_key).sign(self.__myHash__())
-    
+
     def verify_transaction(self):
         h = self.__myHash__()
-        return PKCS1_v1_5.new(self.sender_address).verify(h, self.signature)
+        return PKCS1_v1_5.new(RSA.import_key(self.sender_address)).verify(h, self.signature)
 
     def stringify(self, node):
-	    return '({}, {}, {})'.format(node.address_to_host(self.sender_address), node.address_to_host(self.receiver_address), self.amount)
+        return '({}, {}, {})'.format(node.address_to_host(self.sender_address), node.address_to_host(self.receiver_address), self.amount)
 
     def __hash__(self):
         return self.transaction_id
