@@ -80,3 +80,6 @@ def execute(n, s):
         print('found valid block')
         blcS.on_next(b)
         do_block(n, b)
+
+    else:
+        print('Unknown command {}'.format(s))

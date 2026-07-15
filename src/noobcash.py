@@ -36,7 +36,7 @@ app = Flask(__name__)
 def create_global_variable(name, value):
     if name not in globals():
         globals()[name] = value
-    
+
 # Flask endpoints
 
 # Backbone endpoints
@@ -123,7 +123,7 @@ def load_senario():
             settings.pure_transactions = len(commands_script)
     if command.startswith('run'):
         commandS.on_next('special')
-    
+
     return jsonify('OK')
 
 # management endpoint
@@ -187,7 +187,7 @@ if (len(sys.argv) == 2) and (sys.argv[1] == "boot"):
 
     # settings.difficulty = 4
 
-    def current_node(): 
+    def current_node():
         global bootstrap_node
         return bootstrap_node
 
@@ -206,7 +206,7 @@ else:
     ip = sys.argv[1]
     port = int(sys.argv[2])
 
-    def current_node(): 
+    def current_node():
         global miner_node
         return miner_node
 

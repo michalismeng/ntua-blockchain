@@ -20,9 +20,9 @@ def broadcast(hosts, api, message):
             response = requests.post('http://{}:{}/{}'.format(ip, port, api), message)
             responses.append(jp.decode(response.text, keys = True))
 
-        except:
-            pass
-    
+        except Exception as e:
+            print(e)
+
     return responses
 
 def geomean(array):
@@ -44,7 +44,7 @@ class RouterShell(cmd.Cmd):
 
     def do_setall(self, args):
         subprocess.call(["./exec_on_all.sh run_node.sh {}".format(args)],shell=True)
-    
+
     def do_killall(self, args):
         subprocess.check_call("./exec_on_all.sh kill_all.sh",   shell=True)
 
@@ -64,7 +64,7 @@ class RouterShell(cmd.Cmd):
         self.N, self.capacity, self.difficulty = broadcast([self.bootstrap_host] ,'management', { 'command': 'config' })[0]
         print('Current configuration: ')
         print('N: {}, Capacity: {}, Difficulty: {}'.format(self.N, self.capacity, self.difficulty))
-        
+
     def do_ping(self, args):
         nodes = broadcast(self.hosts, 'management', { 'command': 'echo-id' })
         for id, ip, port in nodes:
@@ -104,7 +104,7 @@ class RouterShell(cmd.Cmd):
         if len(args.split(' ')) != 3:
             print('Usage: t idSrc idDst amount')
             return
-        
+
         idSrc, idDst, amount = args.split(' ')
         broadcast(self.hosts, 'execute-command', { 'command': 'exec {} t {} {}'.format(idSrc, idDst[2:], amount) })
 
@@ -112,7 +112,7 @@ class RouterShell(cmd.Cmd):
     def do_sst(self, args):
         broadcast(self.hosts, 'load-simulation', { 'command': 'load ' + args })
         broadcast(self.hosts, 'load-simulation', { 'command': 'run'})
-    
+
     # Get stats
     def do_stats(self, args):
         stats = broadcast(self.hosts, 'get-stats', { })
@@ -130,15 +130,15 @@ class RouterShell(cmd.Cmd):
             if len(stat['mblc']) == 0:
                 res2.append('NaN')
             else:
-                res2.append(sum([x for x,_,_ in stat['mblc']]) / len(stat['mblc']))         
-                res22.append(geomean([x for x,_,_ in stat['mblc']]))   
+                res2.append(sum([x for x,_,_ in stat['mblc']]) / len(stat['mblc']))
+                res22.append(geomean([x for x,_,_ in stat['mblc']]))
 
             trx += stat['ptsx']
             if stat['tsx'][self.N-1][0] < min_time:
                 min_time = stat['tsx'][self.N-1][0]
             if stat['blc'][-1][0] >  max_time:
                 max_time = stat['blc'][-1][0]
-        
+
         res = trx / (max_time - min_time)
 
         print('Transaction throughput: {}'.format(res))
@@ -147,7 +147,7 @@ class RouterShell(cmd.Cmd):
         print('Mean of block time: {}'.format(geomean(res2)))
         print('Geomean of block time: {}'.format(geomean(res22)))
 
-    
+
 if __name__ == '__main__':
     args = parser.parse_args()
 
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     if ':' not in args.boot_host:
         print('Could not parse ip, port pair')
         exit(1)
-    
+
     # get ip, port of bootstrap node
     ip, port = args.boot_host.split(':')
 
